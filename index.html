@@ -1,0 +1,2254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glitchonomy · Staffing</title>
+
+    <!-- FullCalendar -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/locales/fr.global.min.js"></script>
+
+    <!-- Google API -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+
+    <!-- Day.js -->
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/isSameOrBefore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/isSameOrAfter.js"></script>
+
+    <style>
+        /* === DESIGN SYSTEM — LIGHT THEME === */
+        :root {
+            --bg:          #f4f4f8;
+            --bg2:         #ffffff;
+            --bg3:         #f0f0f5;
+            --border:      #dddde8;
+            --text:        #18182a;
+            --text-muted:  #7878a0;
+            --accent:      #5b4ee8;
+            --accent-soft: #5b4ee812;
+            --green:       #059669;
+            --amber:       #d97706;
+            --red:         #dc2626;
+            --sidebar-w:   280px;
+            --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+            --font-sans:   'DM Sans', system-ui, sans-serif;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* === HEADER === */
+        header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 0 20px;
+            height: 52px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .logo {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            color: var(--accent);
+        }
+
+        .logo span { color: var(--text-muted); }
+
+        .nav-month {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 24px;
+        }
+
+        .nav-btn {
+            width: 28px; height: 28px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s;
+        }
+        .nav-btn:hover { background: var(--bg3); color: var(--text); }
+
+        .current-month {
+            font-size: 14px;
+            font-weight: 500;
+            min-width: 130px;
+            text-align: center;
+            color: var(--text);
+        }
+
+        .today-btn {
+            font-size: 11px;
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            background: var(--bg2);
+            color: var(--text-muted);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: var(--font-sans);
+        }
+        .today-btn:hover { color: var(--text); border-color: var(--accent); }
+
+        .view-toggle {
+            font-size: 11px;
+            padding: 3px 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: var(--font-sans);
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+        .view-toggle.active {
+            background: var(--bg2);
+            color: var(--accent);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            color: var(--text);
+            transition: all 0.15s;
+            font-family: var(--font-sans);
+        }
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .btn-primary:hover { opacity: 0.85; color: #fff; }
+        .btn-google {
+            background: #fff;
+            color: #333;
+            border-color: #ddd;
+            gap: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .btn-google:hover { border-color: #4285f4; color: #333; }
+
+        /* === LAYOUT === */
+        .app-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* === SIDEBAR === */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--bg2);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .sidebar-section {
+            padding: 14px 14px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-label {
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        /* Capacité bar */
+        .capacity-bar-wrap {
+            margin-bottom: 10px;
+        }
+
+        .capacity-numbers {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+
+        .cap-big {
+            font-family: var(--font-mono);
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .cap-label {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .bar-track {
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .bar-fill.ok     { background: var(--green); }
+        .bar-fill.warn   { background: var(--amber); }
+        .bar-fill.danger { background: var(--red); }
+
+        .cap-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        /* Projets liste */
+        .projects-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 14px;
+        }
+
+        .project-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            margin-bottom: 7px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .project-item:hover { border-color: var(--accent); }
+        .project-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+
+        .project-row1 {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 5px;
+        }
+
+        .project-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .project-name {
+            font-size: 13px;
+            font-weight: 500;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-status {
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .project-row2 {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            padding-left: 15px;
+        }
+
+        .project-progress {
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            margin: 5px 0 0 15px;
+            overflow: hidden;
+        }
+
+        .project-progress-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        .add-project-btn {
+            margin: 10px 14px 14px;
+            width: calc(100% - 28px);
+            padding: 8px;
+            border: 1px dashed var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+            font-family: var(--font-sans);
+        }
+        .add-project-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* === CALENDRIER === */
+        .calendar-wrap {
+            flex: 1;
+            padding: 16px;
+            overflow: hidden;
+        }
+
+        /* FullCalendar overrides — light */
+        .fc {
+            height: 100%;
+            font-family: var(--font-sans) !important;
+        }
+
+        .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border) !important; }
+        .fc-theme-standard .fc-scrollgrid { border-color: var(--border) !important; }
+        .fc-col-header-cell-cushion { color: var(--text-muted) !important; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+        .fc-daygrid-day-number { color: var(--text) !important; font-size: 12px; font-weight: 500; }
+        .fc-daygrid-day.fc-day-today { background: var(--accent-soft) !important; }
+        .fc-daygrid-day.fc-day-today .fc-daygrid-day-number { color: var(--accent) !important; font-weight: 700; }
+        .fc-daygrid-day.fc-day-other .fc-daygrid-day-number { color: var(--text-muted) !important; }
+        .fc-scrollgrid { background: var(--bg2) !important; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .fc-daygrid-day { background: var(--bg2); }
+        .fc-timegrid-slot { border-color: var(--border) !important; }
+        .fc-timegrid-axis { color: var(--text-muted) !important; font-size: 11px; }
+        .fc-timegrid-now-indicator-line { border-color: var(--accent) !important; }
+
+        /* Events projet */
+        .fc-event {
+            border-radius: 4px !important;
+            border: none !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            padding: 2px 5px !important;
+            cursor: pointer !important;
+        }
+
+        /* Events Google Calendar */
+        .fc-event.google-event {
+            opacity: 0.55;
+            font-style: italic;
+            cursor: default !important;
+            pointer-events: none;
+        }
+
+        /* Events jalons */
+        .fc-event.jalon-event {
+            border-left: 3px solid rgba(255,255,255,0.4) !important;
+            font-style: italic;
+        }
+
+        /* === MODALS === */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 540px;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+        }
+
+        .modal-header {
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .modal-close {
+            width: 28px; height: 28px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-close:hover { color: var(--text); border-color: var(--text-muted); }
+
+        .modal-body { padding: 20px; }
+
+        .modal-footer {
+            padding: 14px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .form-group { margin-bottom: 14px; }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: var(--font-sans);
+            transition: border-color 0.15s;
+        }
+        .form-input:focus { outline: none; border-color: var(--accent); }
+
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+
+        /* Priority selector */
+        .prio-select {
+            display: flex;
+            gap: 6px;
+        }
+        .prio-btn {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.15s;
+            font-family: var(--font-sans);
+        }
+        .prio-btn:hover { border-color: var(--accent); color: var(--text); }
+        .prio-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+        /* Zone IA */
+        .ai-zone {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .ai-zone-header {
+            padding: 8px 12px;
+            background: var(--bg3);
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ai-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-radius: 4px;
+            border: 1px solid var(--accent);
+        }
+
+        .ai-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 12px;
+            font-family: var(--font-sans);
+            resize: vertical;
+            min-height: 80px;
+        }
+        .ai-textarea:focus { outline: none; }
+        .ai-textarea::placeholder { color: var(--text-muted); }
+
+        .ai-actions {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg3);
+            border-top: 1px solid var(--border);
+        }
+
+        /* Jalons extracted */
+        .jalons-detected {
+            display: none;
+            border: 1px solid var(--green);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+        .jalons-detected.active { display: block; }
+
+        .jalons-header {
+            padding: 8px 12px;
+            background: rgba(52, 211, 153, 0.08);
+            font-size: 11px;
+            color: var(--green);
+            border-bottom: 1px solid rgba(52, 211, 153, 0.2);
+        }
+
+        .jalon-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+        }
+        .jalon-item:last-child { border-bottom: none; }
+
+        .jalon-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            flex-shrink: 0;
+        }
+
+        .jalon-name { flex: 1; }
+
+        .jalon-date {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Color picker */
+        .color-dots {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .color-dot {
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.15s;
+        }
+        .color-dot.selected { border-color: white; transform: scale(1.15); }
+
+        /* Notifications */
+        .notif-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .notif {
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid;
+            max-width: 320px;
+            animation: slideIn 0.2s ease;
+        }
+        .notif.success { background: rgba(52,211,153,0.1); border-color: var(--green); color: var(--green); }
+        .notif.error   { background: rgba(248,113,113,0.1); border-color: var(--red); color: var(--red); }
+        .notif.warning { background: rgba(251,191,36,0.1); border-color: var(--amber); color: var(--amber); }
+        .notif.info    { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Config panel */
+        .config-panel {
+            position: fixed;
+            top: 52px;
+            right: 0;
+            width: 320px;
+            height: calc(100vh - 52px);
+            background: var(--bg2);
+            border-left: 1px solid var(--border);
+            z-index: 50;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .config-panel.open { transform: translateX(0); }
+
+        .config-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .config-group { margin-bottom: 16px; }
+
+        /* Loading state */
+        .spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Google status */
+        .google-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .google-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+        .google-dot.connected { background: var(--green); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* Menu contextuel */
+        .ctx-menu {
+            position: fixed;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 4px;
+            z-index: 1000;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            min-width: 160px;
+            display: none;
+        }
+        .ctx-menu.active { display: block; }
+        .ctx-item {
+            padding: 7px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text);
+            transition: background 0.1s;
+        }
+        .ctx-item:hover { background: var(--bg3); }
+        .ctx-item.danger { color: var(--red); }
+        .ctx-item.danger:hover { background: rgba(220,38,38,0.08); }
+        .ctx-separator { height: 1px; background: var(--border); margin: 3px 0; }
+    </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+    <div class="logo">glitchonomy<span>/staffing</span></div>
+
+    <div class="nav-month">
+        <button class="nav-btn" onclick="app.prev()">←</button>
+        <button class="today-btn" onclick="app.goToToday()">Aujourd'hui</button>
+        <div class="current-month" id="currentMonthLabel">—</div>
+        <button class="nav-btn" onclick="app.next()">→</button>
+    </div>
+    <div style="display:flex;gap:4px;margin-left:8px;background:var(--bg3);border-radius:7px;padding:3px;border:1px solid var(--border)">
+        <button class="view-toggle active" id="viewMois" onclick="app.setView('month')">Mois</button>
+        <button class="view-toggle" id="viewSemaine" onclick="app.setView('week')">Semaine</button>
+    </div>
+
+    <div class="header-right">
+        <div class="google-status" id="googleStatus">
+            <div class="google-dot" id="googleDot"></div>
+            <span id="googleStatusText">Non connecté</span>
+        </div>
+        <button class="btn btn-google" id="googleAuthBtn" onclick="app.toggleGoogleAuth()">
+            <svg width="14" height="14" viewBox="0 0 24 24">
+                <path fill="#4285f4" d="M23.745 12.27c0-.79-.07-1.54-.19-2.27h-11.3v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
+                <path fill="#34a853" d="M12.255 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-3.98v3.09C3.515 21.3 7.615 24 12.255 24z"/>
+                <path fill="#fbbc05" d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62h-3.98a11.86 11.86 0 000 10.76l3.98-3.09z"/>
+                <path fill="#ea4335" d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0c-4.64 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"/>
+            </svg>
+            Google Calendar
+        </button>
+        <button class="btn" onclick="app.replanifyAndRefresh()" title="Recharger Google Cal et redistribuer les projets">⚙️ Re-planifier</button>
+        <button class="btn" onclick="app.openConfig()">⚙</button>
+        <button class="btn btn-primary" onclick="app.openNewProject()">+ Projet</button>
+    </div>
+</header>
+
+<!-- ===== APP BODY ===== -->
+<div class="app-body">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <!-- Capacité du mois -->
+        <div class="sidebar-section">
+            <div class="sidebar-label">Capacité · <span id="capacityMonth">—</span></div>
+            <div class="capacity-bar-wrap">
+                <div class="capacity-numbers">
+                    <div>
+                        <div class="cap-big" id="capDispoNum">—</div>
+                        <div class="cap-label">jours disponibles</div>
+                    </div>
+                    <div style="text-align:right">
+                        <div class="cap-big" id="capTotalNum" style="font-size:15px;color:var(--text-muted)">— / —</div>
+                        <div class="cap-label">occupés / total</div>
+                    </div>
+                </div>
+                <div class="bar-track">
+                    <div class="bar-fill ok" id="capBar" style="width:0%"></div>
+                </div>
+                <div class="cap-detail">
+                    <span>📅 <span id="capGoogle">0j Google</span></span>
+                    <span>📌 <span id="capProjets">0j projets</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projets -->
+        <div class="sidebar-label" style="padding: 12px 14px 4px; margin:0">Projets</div>
+        <div class="projects-list" id="projectsList">
+            <div style="text-align:center; padding:30px 0; color:var(--text-muted); font-size:12px;">
+                Aucun projet<br>
+                <span style="font-size:20px;margin-top:8px;display:block">📋</span>
+            </div>
+        </div>
+        <button class="add-project-btn" onclick="app.openNewProject()">+ Nouveau projet</button>
+    </aside>
+
+    <!-- CALENDRIER -->
+    <div class="calendar-wrap">
+        <div id="calendar"></div>
+    </div>
+</div>
+
+<!-- ===== MODAL NOUVEAU PROJET ===== -->
+<div class="modal-overlay" id="projectModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="projectModalTitle">Nouveau projet</div>
+            <button class="modal-close" onclick="app.closeProjectModal()">✕</button>
+        </div>
+        <div class="modal-body">
+
+            <!-- IA : Extraction jalons -->
+            <div class="ai-zone">
+                <div class="ai-zone-header">
+                    <span>Extraction automatique des jalons</span>
+                    <span class="ai-badge">✨ IA</span>
+                </div>
+                <textarea class="ai-textarea" id="aiText"
+                    placeholder="Colle ici ta proposition commerciale, ton brief, ton email client... L'IA détectera les jalons automatiquement."></textarea>
+                <div class="ai-actions">
+                    <button class="btn" onclick="app.extractFromText()" style="font-size:11px">
+                        ✨ Extraire les jalons
+                    </button>
+                    <label class="btn" style="font-size:11px;cursor:pointer">
+                        📎 Importer PDF
+                        <input type="file" accept=".pdf" style="display:none" onchange="app.extractFromPDF(this)">
+                    </label>
+                    <div id="aiSpinner" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--text-muted)">
+                        <div class="spinner"></div> Analyse...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Jalons détectés -->
+            <div class="jalons-detected" id="jalonsDetected">
+                <div class="jalons-header">✅ Jalons détectés — vérifiez et ajustez</div>
+                <div id="jalonsDetectedList"></div>
+            </div>
+
+            <!-- Formulaire projet -->
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label class="form-label">Nom du projet</label>
+                    <input type="text" class="form-input" id="projectName" placeholder="Ex: Refonte site ACME">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Client</label>
+                    <input type="text" class="form-input" id="projectClient" placeholder="Client">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Jours vendus</label>
+                    <input type="number" class="form-input" id="projectJours" min="0.25" step="0.25" placeholder="10">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Kick-off</label>
+                    <input type="date" class="form-input" id="projectKickoff">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Deadline</label>
+                    <input type="date" class="form-input" id="projectDeadline">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Priorité</label>
+                <div class="prio-select" id="prioSelect">
+                    <button class="prio-btn active" data-prio="1" onclick="app.selectPrio(1)">P1 · Urgent</button>
+                    <button class="prio-btn" data-prio="2" onclick="app.selectPrio(2)">P2 · Normal</button>
+                    <button class="prio-btn" data-prio="3" onclick="app.selectPrio(3)">P3 · Flexible</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Couleur</label>
+                <div class="color-dots" id="colorPicker">
+                    <div class="color-dot selected" style="background:#7c6af7" data-color="#7c6af7" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#34d399" data-color="#34d399" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#60a5fa" data-color="#60a5fa" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#f97316" data-color="#f97316" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#f472b6" data-color="#f472b6" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#a78bfa" data-color="#a78bfa" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#2dd4bf" data-color="#2dd4bf" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#fb7185" data-color="#fb7185" onclick="app.selectColor(this)"></div>
+                    <div class="color-dot" style="background:#facc15" data-color="#facc15" onclick="app.selectColor(this)"></div>
+                </div>
+            </div>
+
+            <!-- Jalons manuels -->
+            <div class="form-group">
+                <label class="form-label" style="display:flex;justify-content:space-between">
+                    <span>Jalons</span>
+                    <button onclick="app.addMilestoneRow()" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer">+ Ajouter</button>
+                </label>
+                <div id="milestonesList"></div>
+            </div>
+
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="app.closeProjectModal()">Annuler</button>
+            <button class="btn" id="deleteProjectBtn" style="display:none;color:var(--red);border-color:var(--red)" 
+                onclick="app.deleteCurrentProject()">🗑 Supprimer</button>
+            <button class="btn btn-primary" onclick="app.saveProject()" id="saveProjectBtn">Créer le projet</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== CONFIG PANEL ===== -->
+<div class="config-panel" id="configPanel">
+    <div class="config-title">⚙️ Configuration</div>
+
+    <div class="config-group">
+        <label class="form-label">Google Client ID</label>
+        <input type="text" class="form-input" id="configClientId"
+            placeholder="xxxx.apps.googleusercontent.com"
+            onchange="app.saveConfig()">
+    </div>
+
+    <div class="config-group">
+        <label class="form-label">Claude API Key</label>
+        <input type="password" class="form-input" id="configClaudeKey"
+            placeholder="sk-ant-..."
+            onchange="app.saveConfig()">
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">
+            Utilisée localement pour extraire les jalons. Non envoyée à un serveur tiers.
+        </div>
+    </div>
+
+    <div class="config-group">
+        <label class="form-label">Heures par jour</label>
+        <input type="number" class="form-input" id="configHeuresJour" value="8" min="1" max="12" step="0.5"
+            onchange="app.saveConfig()">
+    </div>
+
+    <div class="config-group">
+        <label class="form-label">Seuil "jour occupé" (heures de RDV)</label>
+        <input type="number" class="form-input" id="configSeuilOccupe" value="2" min="0.5" max="8" step="0.5"
+            onchange="app.saveConfig()">
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">
+            Un jour avec ≥ X heures de RDV Google est considéré occupé
+        </div>
+    </div>
+
+    <div class="config-group">
+        <label class="form-label">Jours ouvrés par semaine</label>
+        <input type="number" class="form-input" id="configJoursSemaine" value="5" min="1" max="7"
+            onchange="app.saveConfig()">
+    </div>
+
+    <button class="btn" style="width:100%;margin-top:8px" onclick="app.exportData()">⬇️ Exporter données</button>
+    <label class="btn" style="width:100%;margin-top:6px;display:block;text-align:center;cursor:pointer">
+        ⬆️ Importer données
+        <input type="file" accept=".json" style="display:none" onchange="app.importData(this)">
+    </label>
+    <button class="btn" style="width:100%;margin-top:6px;color:var(--red);border-color:var(--red)" onclick="app.clearData()">🗑️ Effacer tout</button>
+
+    <button class="btn" style="width:100%;margin-top:20px" onclick="app.closeConfig()">Fermer</button>
+</div>
+
+<!-- ===== NOTIFICATIONS ===== -->
+<div class="notif-container" id="notifContainer"></div>
+
+<script>
+dayjs.extend(window.dayjs_plugin_isSameOrBefore);
+dayjs.extend(window.dayjs_plugin_isSameOrAfter);
+
+// =============================================
+// CONFIG
+// =============================================
+const CONFIG = {
+    GOOGLE_CLIENT_ID: '',
+    CLAUDE_API_KEY: '',
+    SCOPES: 'https://www.googleapis.com/auth/calendar.readonly',
+    HEURES_JOUR: 8,
+    JOURS_SEMAINE: 5,
+    SEUIL_OCCUPE_HEURES: 2, // Jour "occupé" si >= X heures de RDV
+};
+
+const COLORS = ['#7c6af7','#34d399','#60a5fa','#f97316','#f472b6','#a78bfa','#2dd4bf','#fb7185','#facc15'];
+
+// =============================================
+// APP STATE
+// =============================================
+const app = {
+    calendar: null,
+    currentMonth: dayjs(),
+    googleConnected: false,
+    googleEvents: [],
+    tokenClient: null,
+    accessToken: null,
+    selectedColor: '#7c6af7',
+    selectedPrio: 1,
+    editingProjectId: null,
+
+    data: {
+        projets: []
+    },
+    holidays: new Set(),
+
+    // =============================================
+    // INIT
+    // =============================================
+    init() {
+        this.loadConfig();
+        this.loadData();
+        this.initCalendar();
+        this.updateCapacity();
+        this.renderProjects();
+
+        // Fermer config et menu contextuel en cliquant ailleurs
+        document.addEventListener('click', (e) => {
+            if (!document.getElementById('configPanel').contains(e.target)
+                && !e.target.closest('[onclick="app.openConfig()"]')) {
+                this.closeConfig();
+            }
+            if (!e.target.closest('#ctxMenu')) {
+                this.hideCtxMenu();
+            }
+        });
+    },
+
+    // =============================================
+    // GOOGLE AUTH
+    // =============================================
+    initGoogleAuth() {
+        if (!CONFIG.GOOGLE_CLIENT_ID) {
+            this.notify('Config manquante', 'Ajoute ton Google Client ID dans ⚙️', 'warning');
+            return false;
+        }
+
+        try {
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CONFIG.GOOGLE_CLIENT_ID,
+                scope: CONFIG.SCOPES,
+                callback: (response) => {
+                    if (response.error) {
+                        this.notify('Erreur Google', response.error, 'error');
+                        return;
+                    }
+                    this.accessToken = response.access_token;
+                    this.googleConnected = true;
+                    this.updateGoogleStatus(true);
+                    this.loadGoogleEvents();
+                    this.notify('Google Calendar', 'Connecté ! Chargement de l\'agenda...', 'success');
+                }
+            });
+            return true;
+        } catch (e) {
+            this.notify('Erreur', 'Google API non chargée : ' + e.message, 'error');
+            return false;
+        }
+    },
+
+    toggleGoogleAuth() {
+        if (this.googleConnected) {
+            // Déconnecter
+            google.accounts.oauth2.revoke(this.accessToken);
+            this.googleConnected = false;
+            this.accessToken = null;
+            this.googleEvents = [];
+            this.updateGoogleStatus(false);
+            this.calendar.refetchEvents();
+            this.updateCapacity();
+            this.notify('Google Calendar', 'Déconnecté', 'info');
+            return;
+        }
+
+        if (!this.tokenClient && !this.initGoogleAuth()) return;
+        this.tokenClient.requestAccessToken({ prompt: '' });
+    },
+
+    updateGoogleStatus(connected) {
+        document.getElementById('googleDot').className = 'google-dot' + (connected ? ' connected' : '');
+        document.getElementById('googleStatusText').textContent = connected ? 'Google connecté' : 'Non connecté';
+        document.getElementById('googleAuthBtn').querySelector('span') &&
+            (document.getElementById('googleAuthBtn').lastChild.textContent =
+                connected ? ' Déconnecter' : ' Google Calendar');
+    },
+
+    async loadGoogleEvents() {
+        if (!this.accessToken) return;
+
+        // Charger sur 3 mois pour le planning
+        const rangeStart = this.currentMonth.subtract(1, 'month').startOf('month').toISOString();
+        const rangeEnd = this.currentMonth.add(3, 'month').endOf('month').toISOString();
+
+        try {
+            // Charger agenda principal
+            const [primaryResp, holidaysResp] = await Promise.all([
+                fetch(
+                    `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+                    `timeMin=${rangeStart}&timeMax=${rangeEnd}&singleEvents=true&orderBy=startTime&maxResults=500`,
+                    { headers: { Authorization: `Bearer ${this.accessToken}` } }
+                ),
+                // Calendrier fériés français
+                fetch(
+                    `https://www.googleapis.com/calendar/v3/calendars/fr.french%23holiday%40group.v.calendar.google.com/events?` +
+                    `timeMin=${rangeStart}&timeMax=${rangeEnd}&singleEvents=true&orderBy=startTime&maxResults=50`,
+                    { headers: { Authorization: `Bearer ${this.accessToken}` } }
+                ).catch(() => ({ json: () => ({ items: [] }) }))
+            ]);
+
+            const primaryData = await primaryResp.json();
+            const holidaysData = await holidaysResp.json();
+
+            this.googleEvents = primaryData.items || [];
+            // Fériés : marqués spécifiquement
+            this.holidays = new Set(
+                (holidaysData.items || []).map(ev => ev.start?.date || ev.start?.dateTime?.slice(0,10))
+            );
+
+            this.calendar.refetchEvents();
+            this.updateCapacity();
+        } catch (e) {
+            this.notify('Erreur Google', 'Impossible de charger l\'agenda', 'error');
+        }
+    },
+
+    // =============================================
+    // CALENDRIER
+    // =============================================
+    initCalendar() {
+        const el = document.getElementById('calendar');
+        this.calendar = new FullCalendar.Calendar(el, {
+            locale: 'fr',
+            initialView: 'dayGridMonth',
+            headerToolbar: false,
+            firstDay: 1,
+            height: '100%',
+            eventDisplay: 'block',
+            initialDate: this.currentMonth.format('YYYY-MM-DD'),
+            events: (info, successCallback) => {
+                const events = [];
+
+                // Events Google Calendar
+                this.googleEvents.forEach(ev => {
+                    if (!ev.start) return;
+                    events.push({
+                        id: 'g_' + ev.id,
+                        title: ev.summary || '(sans titre)',
+                        start: ev.start.dateTime || ev.start.date,
+                        end: ev.end?.dateTime || ev.end?.date,
+                        backgroundColor: '#e2e8f0',
+                        borderColor: '#94a3b8',
+                        textColor: '#475569',
+                        className: 'google-event',
+                        extendedProps: { type: 'google' }
+                    });
+                });
+
+                // Fériés
+                if (this.holidays) {
+                    this.holidays.forEach(dateStr => {
+                        events.push({
+                            id: 'holiday_' + dateStr,
+                            start: dateStr,
+                            display: 'background',
+                            backgroundColor: '#fef3c7',
+                            extendedProps: { type: 'holiday' }
+                        });
+                    });
+                }
+
+                // Events projets — 1 bloc par jour alloué
+                this.data.projets.forEach(projet => {
+                    // Fond de période
+                    events.push({
+                        id: 'bg_' + projet.id,
+                        start: projet.kickoff,
+                        end: dayjs(projet.deadline).add(1, 'day').format('YYYY-MM-DD'),
+                        display: 'background',
+                        backgroundColor: projet.couleur + '12',
+                        extendedProps: { type: 'bg' }
+                    });
+
+                    // Un bloc par jour alloué
+                    (projet.blocs || []).forEach(bloc => {
+                        const isJalon = bloc.source === 'jalon' || bloc.source === 'jalon_avant';
+                        const ms = isJalon ? projet.milestones?.find(m => m.id === bloc.milestoneId) : null;
+                        const joursLabel = bloc.jours !== 1 ? ` · ${bloc.jours}j` : ' · 1j';
+                        const label = isJalon && ms
+                            ? (bloc.source === 'jalon'
+                                ? `🏁 ${ms.nom}${joursLabel}`
+                                : `⏱ ${ms.nom} (avant)${joursLabel}`)
+                            : `${projet.nom}${joursLabel}`;
+
+                        events.push({
+                            id: 'bloc_' + bloc.id,
+                            title: label,
+                            start: bloc.date,
+                            end: dayjs(bloc.date).add(1, 'day').format('YYYY-MM-DD'),
+                            allDay: true,
+                            backgroundColor: isJalon ? projet.couleur : projet.couleur + 'dd',
+                            borderColor: projet.couleur,
+                            textColor: '#fff',
+                            editable: !bloc.fige,
+                            className: [
+                                isJalon ? 'jalon-event' : '',
+                                bloc.fige ? 'bloc-fige' : ''
+                            ].filter(Boolean).join(' '),
+                            extendedProps: { type: 'bloc', projetId: projet.id, blocId: bloc.id, fige: bloc.fige }
+                        });
+                    });
+                });
+
+                successCallback(events);
+            },
+            datesSet: (dateInfo) => {
+                this.currentMonth = dayjs(dateInfo.view.currentStart);
+                document.getElementById('currentMonthLabel').textContent =
+                    this.currentMonth.format('MMMM YYYY');
+                document.getElementById('capacityMonth').textContent =
+                    this.currentMonth.format('MMMM YYYY');
+
+                if (this.googleConnected) {
+                    this.loadGoogleEvents();
+                }
+                this.updateCapacity();
+            },
+            editable: true,
+            droppable: true,
+            eventDrop: (info) => {
+                const { type, projetId, blocId, fige } = info.event.extendedProps;
+                if (type !== 'bloc' || fige) { info.revert(); return; }
+
+                const newDate = dayjs(info.event.start).format('YYYY-MM-DD');
+                const newDateDjs = dayjs(newDate);
+
+                // Vérifier que c'est un jour ouvré non occupé
+                if (!this.isJourOuvre(newDateDjs)) {
+                    this.notify('Impossible', 'Weekend ou jour férié', 'error');
+                    info.revert(); return;
+                }
+                if (this.isJourOccupeGoogle(newDateDjs)) {
+                    this.notify('Impossible', 'Jour occupé dans Google Calendar', 'error');
+                    info.revert(); return;
+                }
+
+                // Vérifier conflit avec autre projet
+                for (const projet of this.data.projets) {
+                    if (projet.id === projetId) continue;
+                    if ((projet.blocs || []).some(b => b.date === newDate)) {
+                        this.notify('Conflit', `Déjà occupé par "${projet.nom}"`, 'error');
+                        info.revert(); return;
+                    }
+                }
+
+                // Mettre à jour le bloc + le marquer fixé
+                const projet = this.data.projets.find(p => p.id === projetId);
+                const bloc = projet?.blocs?.find(b => b.id === blocId);
+                if (bloc) {
+                    const oldDate = bloc.date;
+                    bloc.date = newDate;
+                    bloc.fige = true; // Déplacé manuellement = fixé
+
+                    // Si c'est un jalon, mettre à jour la date de la milestone
+                    if ((bloc.source === 'jalon' || bloc.source === 'jalon_avant') && bloc.milestoneId) {
+                        const ms = projet.milestones?.find(m => m.id === bloc.milestoneId);
+                        if (ms && bloc.source === 'jalon') {
+                            ms.date = newDate; // Mettre à jour la date du jalon
+                            this.notify('Jalon déplacé', `"${ms.nom}" → ${dayjs(newDate).format('DD/MM')}`, 'success');
+                        } else {
+                            this.notify('Déplacé', `Bloc fixé au ${dayjs(newDate).format('DD/MM')}`, 'success');
+                        }
+                    } else {
+                        this.notify('Déplacé', `Bloc fixé au ${dayjs(newDate).format('DD/MM')}`, 'success');
+                    }
+
+                    this.saveData();
+                    this.updateCapacity();
+                    this.renderProjects();
+                }
+            },
+            eventClick: (info) => {
+                const { type, projetId } = info.event.extendedProps;
+                if (type === 'projet' || type === 'bg') {
+                    this.openEditProject(projetId);
+                }
+            },
+            eventDidMount: (info) => {
+                const { type, projetId, blocId } = info.event.extendedProps;
+                if (type === 'bloc') {
+                    info.el.addEventListener('contextmenu', (e) => {
+                        this.showCtxMenu(e, projetId, blocId);
+                    });
+                }
+            }
+        });
+        this.calendar.render();
+
+        // Init label
+        document.getElementById('currentMonthLabel').textContent =
+            this.currentMonth.format('MMMM YYYY');
+        document.getElementById('capacityMonth').textContent =
+            this.currentMonth.format('MMMM YYYY');
+    },
+
+    prev() { this.calendar.prev(); },
+    next() { this.calendar.next(); },
+    prevMonth() { this.calendar.prev(); },
+    nextMonth() { this.calendar.next(); },
+
+    goToToday() {
+        this.calendar.today();
+    },
+
+    setView(view) {
+        const fcView = view === 'week' ? 'timeGridWeek' : 'dayGridMonth';
+        this.calendar.changeView(fcView);
+        document.getElementById('viewMois').classList.toggle('active', view === 'month');
+        document.getElementById('viewSemaine').classList.toggle('active', view === 'week');
+    },
+
+
+    // =============================================
+    // DISPONIBILITÉ PAR JOUR
+    // =============================================
+    isJourOuvre(date) {
+        // Weekend
+        if (date.day() === 0 || date.day() === 6) return false;
+        // Férié
+        const dateStr = date.format('YYYY-MM-DD');
+        if (this.holidays && this.holidays.has(dateStr)) return false;
+        return true;
+    },
+
+    getHeuresOccupeesGoogle(date) {
+        // Si Google pas connecté → 0
+        if (!this.googleConnected) return 0;
+        
+        // Férié = jour plein
+        const dateStr = date.format('YYYY-MM-DD');
+        if (this.holidays && this.holidays.has(dateStr)) return 8;
+
+        let heuresOccupees = 0;
+        this.googleEvents.forEach(ev => {
+            if (!ev.start || ev.transparency === 'transparent') return;
+            if (ev.status === 'cancelled') return;
+            const selfAttendee = ev.attendees?.find(a => a.self);
+            if (selfAttendee?.responseStatus === 'declined') return;
+
+            if (ev.start.dateTime) {
+                const evStart = dayjs(ev.start.dateTime);
+                if (evStart.isSame(date, 'day')) {
+                    const evEnd = dayjs(ev.end?.dateTime || ev.start.dateTime);
+                    heuresOccupees += evEnd.diff(evStart, 'hour', true);
+                }
+            }
+        });
+        return heuresOccupees;
+    },
+
+    getDispoJour(date) {
+        // Weekend ou férié → 0% dispo
+        if (!this.isJourOuvre(date)) return 0;
+
+        const heures = this.getHeuresOccupeesGoogle(date);
+
+        // Tranches de 2h
+        if (heures >= 6) return 0;      // 6h+ occupé → jour plein
+        if (heures >= 4) return 0.25;   // 4-6h → 25% dispo
+        if (heures >= 2) return 0.5;    // 2-4h → 50% dispo
+        if (heures >  0) return 0.75;   // 0-2h → 75% dispo
+        return 1;                        // 0h  → 100% dispo
+    },
+
+    isJourOccupeGoogle(date) {
+        return this.getDispoJour(date) === 0;
+    },
+
+    isJourLibre(date, excludeProjetId = null) {
+        if (!this.isJourOuvre(date)) return false;
+        if (this.isJourOccupeGoogle(date)) return false;
+
+        // Vérifier blocs projets
+        const dateStr = date.format('YYYY-MM-DD');
+        for (const projet of this.data.projets) {
+            if (projet.id === excludeProjetId) continue;
+            if (!projet.blocs) continue;
+            for (const bloc of projet.blocs) {
+                if (dayjs(bloc.date).format('YYYY-MM-DD') === dateStr) return false;
+            }
+        }
+        return true;
+    },
+
+    // =============================================
+    // ALGO DE PLACEMENT
+    // =============================================
+    repartirTout() {
+        const projetsActifs = this.data.projets
+            .filter(p => p.statut !== 'archive')
+            .sort((a, b) => a.priorite - b.priorite);
+
+        // Vider blocs non fixés
+        projetsActifs.forEach(p => {
+            p.blocs = (p.blocs || []).filter(b => b.fige);
+        });
+
+        // Phase 1 : Placer jalons "avant" + "pendant" (toutes priorités)
+        const tousJalons = [];
+        projetsActifs.forEach(projet => {
+            (projet.milestones || []).forEach(ms => {
+                if (ms.joursPendant > 0) {
+                    tousJalons.push({ projet, ms, type: 'pendant', date: dayjs(ms.date), jours: ms.joursPendant });
+                }
+                if (ms.joursAvant > 0) {
+                    tousJalons.push({ projet, ms, type: 'avant', date: dayjs(ms.date), jours: ms.joursAvant });
+                }
+            });
+        });
+        tousJalons.sort((a, b) => a.date - b.date);
+
+        tousJalons.forEach(({ projet, ms, type, date, jours }) => {
+            if (type === 'pendant') {
+                if (this.isJourLibre(date, null)) {
+                    projet.blocs.push({ id: this.generateId(), date: date.format('YYYY-MM-DD'), jours: Math.min(jours, 1), fige: false, source: 'jalon', milestoneId: ms.id });
+                }
+            } else {
+                // Avant : remonter depuis la veille
+                let cur = date.subtract(1, 'day');
+                let placed = 0;
+                const kickoff = dayjs(projet.kickoff);
+                while (placed < jours && cur.isSameOrAfter(kickoff, 'day')) {
+                    if (this.isJourLibre(cur, null)) {
+                        projet.blocs.push({ id: this.generateId(), date: cur.format('YYYY-MM-DD'), jours: Math.min(jours - placed, 1), fige: false, source: 'jalon_avant', milestoneId: ms.id });
+                        placed++;
+                    }
+                    cur = cur.subtract(1, 'day');
+                }
+                if (placed < jours) {
+                    this.notify('Jalon', `Impossible de placer ${jours - placed}j avant "${ms.nom}" (${projet.nom})`, 'warning');
+                }
+            }
+        });
+
+        // Phase 2 : Placer jours normaux par priorité
+        const alertes = [];
+        projetsActifs.forEach(projet => {
+            const dejaPlaces = (projet.blocs || []).reduce((s, b) => s + (b.jours || 1), 0);
+            let aRepartir = projet.joursVendus - dejaPlaces;
+            if (aRepartir <= 0) return;
+
+            let cur = dayjs(projet.deadline);
+            const kickoff = dayjs(projet.kickoff);
+
+            while (aRepartir > 0 && cur.isSameOrAfter(kickoff, 'day')) {
+                if (this.isJourOuvre(cur)) {
+                    const dispo = this.getDispoJour(cur);
+                    const dateStr = cur.format('YYYY-MM-DD');
+
+                    // Vérifier qu'aucun autre projet n'a déjà pris ce jour
+                    const dejaPris = this.data.projets.some(p =>
+                        p.id !== projet.id && (p.blocs || []).some(b => b.date === dateStr)
+                    );
+
+                    if (dispo > 0 && !dejaPris) {
+                        const joursAPoser = Math.min(aRepartir, dispo);
+                        projet.blocs.push({
+                            id: this.generateId(),
+                            date: dateStr,
+                            jours: joursAPoser,
+                            fige: false,
+                            source: 'auto'
+                        });
+                        aRepartir = Math.round((aRepartir - joursAPoser) * 100) / 100;
+                    }
+                }
+                cur = cur.subtract(1, 'day');
+            }
+            if (aRepartir > 0) {
+                alertes.push(`${projet.nom} : manque ${aRepartir}j à placer`);
+            }
+        });
+
+        this.saveData();
+        this.calendar.refetchEvents();
+        this.updateCapacity();
+        this.renderProjects();
+
+        if (alertes.length) {
+            alertes.forEach(msg => this.notify('Planning', msg, 'warning'));
+        } else {
+            this.notify('Re-planification', 'Tous les projets ont été staffés', 'success');
+        }
+    },
+
+    async replanifyAndRefresh() {
+        this.notify('Chargement', 'Synchronisation Google Calendar...', 'info');
+        if (this.googleConnected) {
+            await this.loadGoogleEvents();
+            // Attendre que le DOM soit mis à jour
+            await new Promise(r => setTimeout(r, 300));
+        }
+        this.notify('Planning', 'Redistribution en cours...', 'info');
+        this.repartirTout();
+    },
+
+    // =============================================
+    // CAPACITÉ
+    // =============================================
+    calculateWorkingDays(monthDate) {
+        const start = monthDate.startOf('month');
+        const end = monthDate.endOf('month');
+        let days = 0;
+        let current = start;
+        while (current.isSameOrBefore(end, 'day')) {
+            if (current.day() !== 0 && current.day() !== 6) days++;
+            current = current.add(1, 'day');
+        }
+        return days;
+    },
+
+    calculateGoogleBusyDays() {
+        if (!this.googleConnected) return 0;
+
+        // Itérer sur tous les jours ouvrés du mois
+        const monthStart = this.currentMonth.startOf('month');
+        const monthEnd = this.currentMonth.endOf('month');
+        let joursBusy = 0;
+        let cur = monthStart;
+
+        while (cur.isSameOrBefore(monthEnd, 'day')) {
+            // Ignorer weekends et fériés
+            if (this.isJourOuvre(cur)) {
+                const heures = this.getHeuresOccupeesGoogle(cur);
+
+                if (heures > 0) {
+                    // Arrondir par tranche de 2h (1h occupée = 2h comptées)
+                    const heuresArrondies = Math.ceil(heures / 2) * 2;
+                    // Convertir en fraction de journée
+                    joursBusy += Math.min(1, heuresArrondies / CONFIG.HEURES_JOUR);
+                }
+            }
+            cur = cur.add(1, 'day');
+        }
+
+        return Math.round(joursBusy * 4) / 4;
+    },
+
+    calculateProjetsDays() {
+        // Jours projets qui chevauchent ce mois
+        const monthStart = this.currentMonth.startOf('month');
+        const monthEnd = this.currentMonth.endOf('month');
+        let total = 0;
+
+        this.data.projets.forEach(projet => {
+            const pStart = dayjs(projet.kickoff);
+            const pEnd = dayjs(projet.deadline);
+
+            // Calculer l'intersection avec le mois
+            const overlapStart = pStart.isAfter(monthStart) ? pStart : monthStart;
+            const overlapEnd = pEnd.isBefore(monthEnd) ? pEnd : monthEnd;
+
+            if (overlapStart.isSameOrBefore(overlapEnd, 'day')) {
+                // Nb jours ouvrés dans l'overlap
+                let current = overlapStart;
+                let daysInMonth = 0;
+                let totalDays = 0;
+                while (current.isSameOrBefore(overlapEnd, 'day')) {
+                    if (current.day() !== 0 && current.day() !== 6) daysInMonth++;
+                    current = current.add(1, 'day');
+                }
+
+                // Durée totale du projet
+                let totalWorkDays = 0;
+                let c = pStart;
+                while (c.isSameOrBefore(pEnd, 'day')) {
+                    if (c.day() !== 0 && c.day() !== 6) totalWorkDays++;
+                    c = c.add(1, 'day');
+                }
+
+                // Prorata des jours vendus
+                if (totalWorkDays > 0) {
+                    total += (daysInMonth / totalWorkDays) * projet.joursVendus;
+                }
+            }
+        });
+        return Math.round(total * 4) / 4; // Arrondi 0.25j
+    },
+
+    updateCapacity() {
+        const totalDays = this.calculateWorkingDays(this.currentMonth);
+        const googleDays = this.calculateGoogleBusyDays();
+        const projetsDays = this.calculateProjetsDays();
+        const occupiedDays = googleDays + projetsDays;
+        const dispoDays = Math.max(0, totalDays - occupiedDays);
+        const percent = Math.min(100, (occupiedDays / totalDays) * 100);
+
+        document.getElementById('capDispoNum').textContent = dispoDays.toFixed(1) + 'j';
+        document.getElementById('capTotalNum').textContent = `${occupiedDays.toFixed(1)} / ${totalDays}j`;
+        document.getElementById('capGoogle').textContent = googleDays + 'j Google';
+        document.getElementById('capProjets').textContent = projetsDays.toFixed(1) + 'j projets';
+
+        const bar = document.getElementById('capBar');
+        bar.style.width = percent + '%';
+        bar.className = 'bar-fill ' + (percent < 60 ? 'ok' : percent < 85 ? 'warn' : 'danger');
+    },
+
+    getProjectStatus(projet) {
+        const monthStart = this.currentMonth.startOf('month');
+        const monthEnd = this.currentMonth.endOf('month');
+        const totalDays = this.calculateWorkingDays(this.currentMonth);
+        const googleDays = this.calculateGoogleBusyDays();
+        const dispoDays = totalDays - googleDays;
+
+        const projetsDays = this.calculateProjetsDays();
+
+        if (projetsDays > dispoDays) return 'danger';
+        if (projetsDays > dispoDays * 0.8) return 'warn';
+        return 'ok';
+    },
+
+    // =============================================
+    // PROJETS
+    // =============================================
+    generateId() {
+        return 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 7);
+    },
+
+    renderProjects() {
+        const container = document.getElementById('projectsList');
+        const projets = this.data.projets;
+
+        if (projets.length === 0) {
+            container.innerHTML = `<div style="text-align:center;padding:30px 0;color:var(--text-muted);font-size:12px;">
+                Aucun projet<br><span style="font-size:20px;margin-top:8px;display:block">📋</span>
+            </div>`;
+            return;
+        }
+
+        const sorted = [...projets].sort((a, b) => a.priorite - b.priorite || dayjs(a.deadline) - dayjs(b.deadline));
+
+        container.innerHTML = sorted.map(projet => {
+            const status = this.getProjectStatus(projet);
+            const emoji = status === 'ok' ? '✅' : status === 'warn' ? '⚠️' : '❌';
+            const deadlineLabel = dayjs(projet.deadline).format('DD/MM');
+            const daysLeft = dayjs(projet.deadline).diff(dayjs(), 'day');
+            const daysLeftLabel = daysLeft < 0 ? 'Expiré' : daysLeft === 0 ? 'Aujourd\'hui' : `${daysLeft}j restants`;
+
+            // Avancement estimé (jours passés / durée totale)
+            const totalDuration = dayjs(projet.deadline).diff(dayjs(projet.kickoff), 'day') || 1;
+            const elapsed = dayjs().diff(dayjs(projet.kickoff), 'day');
+            const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+
+            return `
+                <div class="project-item" onclick="app.openEditProject('${projet.id}')">
+                    <div class="project-row1">
+                        <div class="project-dot" style="background:${projet.couleur}"></div>
+                        <div class="project-name">${projet.nom}</div>
+                        <div class="project-status">${emoji}</div>
+                    </div>
+                    <div class="project-row2">
+                        <span>P${projet.priorite} · ${projet.joursVendus}j</span>
+                        <span>📅 ${deadlineLabel} · ${daysLeftLabel}</span>
+                    </div>
+                    ${projet.milestones?.length ? `<div class="project-row2" style="margin-top:2px">
+                        <span>🏁 ${projet.milestones.length} jalon${projet.milestones.length > 1 ? 's' : ''}</span>
+                        <span>${projet.client || ''}</span>
+                    </div>` : ''}
+                    <div class="project-progress">
+                        <div class="project-progress-fill" style="width:${progress}%;background:${projet.couleur}"></div>
+                    </div>
+                </div>`;
+        }).join('');
+    },
+
+    openNewProject() {
+        this.editingProjectId = null;
+        document.getElementById('projectModalTitle').textContent = 'Nouveau projet';
+        document.getElementById('saveProjectBtn').textContent = 'Créer le projet';
+        document.getElementById('deleteProjectBtn').style.display = 'none';
+        document.getElementById('projectName').value = '';
+        document.getElementById('projectClient').value = '';
+        document.getElementById('projectJours').value = '';
+        document.getElementById('projectKickoff').value = dayjs().format('YYYY-MM-DD');
+        document.getElementById('projectDeadline').value = '';
+        document.getElementById('aiText').value = '';
+        document.getElementById('jalonsDetected').classList.remove('active');
+        document.getElementById('milestonesList').innerHTML = '';
+        this.selectedPrio = 1;
+        this.selectedColor = '#7c6af7';
+        this.updatePrioUI();
+        this.updateColorUI();
+        document.getElementById('projectModal').classList.add('active');
+        setTimeout(() => document.getElementById('projectName').focus(), 100);
+    },
+
+    openEditProject(id) {
+        const projet = this.data.projets.find(p => p.id === id);
+        if (!projet) return;
+
+        this.editingProjectId = id;
+        document.getElementById('projectModalTitle').textContent = 'Modifier le projet';
+        document.getElementById('saveProjectBtn').textContent = 'Enregistrer';
+        document.getElementById('deleteProjectBtn').style.display = 'inline-block';
+        document.getElementById('projectName').value = projet.nom;
+        document.getElementById('projectClient').value = projet.client || '';
+        document.getElementById('projectJours').value = projet.joursVendus;
+        document.getElementById('projectKickoff').value = projet.kickoff;
+        document.getElementById('projectDeadline').value = projet.deadline;
+        document.getElementById('aiText').value = '';
+        document.getElementById('jalonsDetected').classList.remove('active');
+        this.selectedPrio = projet.priorite;
+        this.selectedColor = projet.couleur;
+        this.updatePrioUI();
+        this.updateColorUI();
+        this.renderMilestonesList(projet.milestones || []);
+        document.getElementById('projectModal').classList.add('active');
+    },
+
+    closeProjectModal() {
+        document.getElementById('projectModal').classList.remove('active');
+        this.editingProjectId = null;
+    },
+
+    saveProject() {
+        const nom = document.getElementById('projectName').value.trim();
+        const client = document.getElementById('projectClient').value.trim();
+        const joursVendus = parseFloat(document.getElementById('projectJours').value);
+        const kickoff = document.getElementById('projectKickoff').value;
+        const deadline = document.getElementById('projectDeadline').value;
+
+        if (!nom) { this.notify('Erreur', 'Nom du projet requis', 'error'); return; }
+        if (!joursVendus || joursVendus <= 0) { this.notify('Erreur', 'Jours vendus invalides', 'error'); return; }
+        if (!kickoff || !deadline) { this.notify('Erreur', 'Dates requises', 'error'); return; }
+        if (dayjs(deadline).isBefore(dayjs(kickoff))) { this.notify('Erreur', 'Deadline avant kick-off', 'error'); return; }
+
+        const milestones = this.collectMilestones();
+
+        if (this.editingProjectId) {
+            const idx = this.data.projets.findIndex(p => p.id === this.editingProjectId);
+            if (idx >= 0) {
+                this.data.projets[idx] = {
+                    ...this.data.projets[idx],
+                    nom, client, joursVendus, kickoff, deadline,
+                    priorite: this.selectedPrio,
+                    couleur: this.selectedColor,
+                    milestones
+                };
+                this.notify('Projet', 'Modifié avec succès', 'success');
+            }
+        } else {
+            const projet = {
+                id: this.generateId(),
+                nom, client, joursVendus, kickoff, deadline,
+                priorite: this.selectedPrio,
+                couleur: this.selectedColor,
+                milestones,
+                createdAt: new Date().toISOString()
+            };
+            this.data.projets.push(projet);
+            this.notify('Projet', `"${nom}" créé`, 'success');
+        }
+
+        this.saveData();
+        this.repartirTout(); // Redistribuer après création/modification
+        this.renderProjects();
+        this.updateCapacity();
+        this.calendar.refetchEvents();
+        this.closeProjectModal();
+    },
+
+    deleteProject(id) {
+        if (!confirm('Supprimer ce projet ?')) return;
+        this.data.projets = this.data.projets.filter(p => p.id !== id);
+        this.saveData();
+        this.renderProjects();
+        this.updateCapacity();
+        this.calendar.refetchEvents();
+        this.closeProjectModal();
+    },
+
+    deleteCurrentProject() {
+        if (!this.editingProjectId) return;
+        this.deleteProject(this.editingProjectId);
+    },
+
+    // =============================================
+    // JALONS / MILESTONES
+    // =============================================
+    addMilestoneRow(nom = '', date = '', joursAvant = 0, joursPendant = 0) {
+        const container = document.getElementById('milestonesList');
+        const id = 'ms_' + Date.now();
+        const row = document.createElement('div');
+        row.className = 'form-row';
+        row.id = id;
+        row.style.marginBottom = '6px';
+        row.innerHTML = `
+            <div style="display:grid;grid-template-columns:2fr 1fr 0.7fr 0.7fr auto;gap:6px;align-items:end;width:100%">
+                <div>
+                    <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Nom</div>
+                    <input type="text" class="form-input" placeholder="Ex: Présentation client" value="${nom}" style="font-size:12px">
+                </div>
+                <div>
+                    <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Date jalon</div>
+                    <input type="date" class="form-input" value="${date}" style="font-size:12px">
+                </div>
+                <div>
+                    <div style="font-size:10px;color:var(--accent);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">⏱ Avant (j)</div>
+                    <input type="number" class="form-input" placeholder="0" value="${joursAvant}" min="0" step="0.25" style="font-size:12px" title="Jours de préparation AVANT le jalon">
+                </div>
+                <div>
+                    <div style="font-size:10px;color:var(--green);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">🏁 Jalon (j)</div>
+                    <input type="number" class="form-input" placeholder="0" value="${joursPendant}" min="0" step="0.25" style="font-size:12px" title="Jours dédiés LE JOUR du jalon">
+                </div>
+                <button onclick="document.getElementById('${id}').remove()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0 4px;font-size:18px;margin-bottom:2px">×</button>
+            </div>
+        `;
+        container.appendChild(row);
+    },
+
+    collectMilestones() {
+        const rows = document.getElementById('milestonesList').children;
+        const milestones = [];
+        Array.from(rows).forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            const nom = inputs[0]?.value.trim();
+            const date = inputs[1]?.value;
+            const joursAvant = parseFloat(inputs[2]?.value) || 0;
+            const joursPendant = parseFloat(inputs[3]?.value) || 0;
+            if (nom && date) {
+                milestones.push({
+                    id: 'ms_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                    nom, date, joursAvant, joursPendant
+                });
+            }
+        });
+        return milestones;
+    },
+
+    renderMilestonesList(milestones) {
+        document.getElementById('milestonesList').innerHTML = '';
+        milestones.forEach(ms => {
+            this.addMilestoneRow(ms.nom, ms.date, ms.joursAvant, ms.joursPendant);
+        });
+    },
+
+    // =============================================
+    // EXTRACTION IA
+    // =============================================
+    async extractFromText() {
+        const text = document.getElementById('aiText').value.trim();
+        if (!text) {
+            this.notify('IA', 'Colle du texte d\'abord', 'warning');
+            return;
+        }
+        await this.extractMilestones(text);
+    },
+
+    async extractFromPDF(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        this.notify('PDF', 'Lecture du fichier...', 'info');
+
+        // Lire le PDF en base64
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result.split(',')[1];
+            await this.extractMilestones(null, base64);
+        };
+        reader.readAsDataURL(file);
+    },
+
+    async extractMilestones(text = null, pdfBase64 = null) {
+        if (!CONFIG.CLAUDE_API_KEY) {
+            this.notify('Config', 'Ajoute ta clé Claude API dans ⚙️', 'warning');
+            return;
+        }
+
+        const spinner = document.getElementById('aiSpinner');
+        spinner.style.display = 'flex';
+
+        const systemPrompt = `Tu es un assistant qui analyse des documents professionnels (propositions commerciales, briefs, emails) pour en extraire des jalons de projet.
+
+Réponds UNIQUEMENT avec un JSON valide, sans markdown, sans explication :
+{
+  "nom_projet": "string ou null",
+  "client": "string ou null",
+  "jours_vendus": number ou null,
+  "kickoff": "YYYY-MM-DD ou null",
+  "deadline": "YYYY-MM-DD ou null",
+  "jalons": [
+    {
+      "nom": "string",
+      "date": "YYYY-MM-DD",
+      "jours_avant": number,
+      "jours_pendant": number
+    }
+  ]
+}
+
+Règles :
+- Pour les dates, convertis en format YYYY-MM-DD (suppose l'année en cours si non précisée)
+- jours_avant = jours de préparation avant le jalon
+- jours_pendant = jours dédiés le jour J
+- Détecte les livrables, présentations, comités de pilotage, réunions importantes
+- Si une information est absente, mets null`;
+
+        const messages = [];
+        if (pdfBase64) {
+            messages.push({
+                role: 'user',
+                content: [
+                    {
+                        type: 'document',
+                        source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
+                    },
+                    { type: 'text', text: 'Analyse ce document et extrais les informations du projet et ses jalons.' }
+                ]
+            });
+        } else {
+            messages.push({
+                role: 'user',
+                content: `Analyse ce texte et extrais les informations du projet et ses jalons :\n\n${text}`
+            });
+        }
+
+        try {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': CONFIG.CLAUDE_API_KEY,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-calls': 'true'
+                },
+                body: JSON.stringify({
+                    model: 'claude-sonnet-4-5-20250929',
+                    max_tokens: 1000,
+                    system: systemPrompt,
+                    messages
+                })
+            });
+
+            const data = await response.json();
+            const rawText = data.content?.[0]?.text || '';
+
+            // Parser le JSON
+            let extracted;
+            try {
+                extracted = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+            } catch {
+                throw new Error('Réponse IA invalide');
+            }
+
+            // Préremplir le formulaire
+            if (extracted.nom_projet) document.getElementById('projectName').value = extracted.nom_projet;
+            if (extracted.client) document.getElementById('projectClient').value = extracted.client;
+            if (extracted.jours_vendus) document.getElementById('projectJours').value = extracted.jours_vendus;
+            if (extracted.kickoff) document.getElementById('projectKickoff').value = extracted.kickoff;
+            if (extracted.deadline) document.getElementById('projectDeadline').value = extracted.deadline;
+
+            // Afficher les jalons détectés
+            const jalons = extracted.jalons || [];
+            if (jalons.length > 0) {
+                const list = document.getElementById('jalonsDetectedList');
+                list.innerHTML = jalons.map((j, i) => `
+                    <div class="jalon-item">
+                        <div class="jalon-dot"></div>
+                        <div class="jalon-name">${j.nom}</div>
+                        <div class="jalon-date">${j.date || '?'}</div>
+                        <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">
+                            ${j.jours_avant}j avant · ${j.jours_pendant}j pendant
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('jalonsDetected').classList.add('active');
+
+                // Pré-remplir les jalons manuels
+                document.getElementById('milestonesList').innerHTML = '';
+                jalons.forEach(j => {
+                    this.addMilestoneRow(j.nom, j.date || '', j.jours_avant || 0, j.jours_pendant || 0);
+                });
+            }
+
+            this.notify('IA', `${jalons.length} jalon(s) détecté(s)`, 'success');
+
+        } catch (e) {
+            this.notify('Erreur IA', e.message, 'error');
+        } finally {
+            spinner.style.display = 'none';
+        }
+    },
+
+    // =============================================
+    // UI HELPERS
+    // =============================================
+    selectPrio(prio) {
+        this.selectedPrio = prio;
+        this.updatePrioUI();
+    },
+
+    updatePrioUI() {
+        document.querySelectorAll('.prio-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.prio) === this.selectedPrio);
+        });
+    },
+
+    selectColor(el) {
+        this.selectedColor = el.dataset.color;
+        this.updateColorUI();
+    },
+
+    updateColorUI() {
+        document.querySelectorAll('.color-dot').forEach(dot => {
+            dot.classList.toggle('selected', dot.dataset.color === this.selectedColor);
+        });
+    },
+
+    // =============================================
+    // CONFIG
+    // =============================================
+    openConfig() {
+        document.getElementById('configPanel').classList.toggle('open');
+        document.getElementById('configClientId').value = CONFIG.GOOGLE_CLIENT_ID;
+        document.getElementById('configClaudeKey').value = CONFIG.CLAUDE_API_KEY;
+        document.getElementById('configHeuresJour').value = CONFIG.HEURES_JOUR;
+        document.getElementById('configJoursSemaine').value = CONFIG.JOURS_SEMAINE;
+        document.getElementById('configSeuilOccupe').value = CONFIG.SEUIL_OCCUPE_HEURES;
+    },
+
+    closeConfig() {
+        document.getElementById('configPanel').classList.remove('open');
+    },
+
+    saveConfig() {
+        CONFIG.GOOGLE_CLIENT_ID = document.getElementById('configClientId').value.trim();
+        CONFIG.CLAUDE_API_KEY = document.getElementById('configClaudeKey').value.trim();
+        CONFIG.HEURES_JOUR = parseFloat(document.getElementById('configHeuresJour').value) || 8;
+        CONFIG.JOURS_SEMAINE = parseInt(document.getElementById('configJoursSemaine').value) || 5;
+        CONFIG.SEUIL_OCCUPE_HEURES = parseFloat(document.getElementById('configSeuilOccupe').value) || 2;
+
+        localStorage.setItem('staffing_config', JSON.stringify({
+            clientId: CONFIG.GOOGLE_CLIENT_ID,
+            claudeKey: CONFIG.CLAUDE_API_KEY,
+            heuresJour: CONFIG.HEURES_JOUR,
+            joursSemaine: CONFIG.JOURS_SEMAINE,
+            seuilOccupe: CONFIG.SEUIL_OCCUPE_HEURES,
+        }));
+        this.updateCapacity();
+        this.notify('Config', 'Sauvegardée', 'success');
+    },
+
+    loadConfig() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('staffing_config') || '{}');
+            if (saved.clientId) CONFIG.GOOGLE_CLIENT_ID = saved.clientId;
+            if (saved.claudeKey) CONFIG.CLAUDE_API_KEY = saved.claudeKey;
+            if (saved.heuresJour) CONFIG.HEURES_JOUR = saved.heuresJour;
+            if (saved.joursSemaine) CONFIG.JOURS_SEMAINE = saved.joursSemaine;
+            if (saved.seuilOccupe) CONFIG.SEUIL_OCCUPE_HEURES = saved.seuilOccupe;
+        } catch {}
+    },
+
+    // =============================================
+    // DATA
+    // =============================================
+    saveData() {
+        localStorage.setItem('staffing_data', JSON.stringify(this.data));
+    },
+
+    loadData() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('staffing_data') || '{}');
+            if (saved.projets) this.data.projets = saved.projets;
+        } catch {}
+    },
+
+    exportData() {
+        const blob = new Blob([JSON.stringify({ ...this.data, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `staffing-${dayjs().format('YYYY-MM-DD')}.json`;
+        a.click();
+        this.notify('Export', 'Fichier téléchargé', 'success');
+    },
+
+    importData(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (imported.projets) {
+                    this.data = { projets: imported.projets };
+                    this.saveData();
+                    this.renderProjects();
+                    this.updateCapacity();
+                    this.calendar.refetchEvents();
+                    this.notify('Import', `${imported.projets.length} projet(s) importés`, 'success');
+                }
+            } catch {
+                this.notify('Erreur', 'Fichier JSON invalide', 'error');
+            }
+        };
+        reader.readAsText(file);
+    },
+
+    clearData() {
+        if (!confirm('Effacer tous les projets ?')) return;
+        this.data = { projets: [] };
+        this.saveData();
+        this.renderProjects();
+        this.updateCapacity();
+        this.calendar.refetchEvents();
+        this.notify('Données', 'Effacées', 'info');
+    },
+
+
+    // =============================================
+    // MENU CONTEXTUEL
+    // =============================================
+    ctxTarget: null,
+
+    showCtxMenu(e, projetId, blocId) {
+        e.preventDefault();
+        this.ctxTarget = { projetId, blocId };
+
+        const projet = this.data.projets.find(p => p.id === projetId);
+        const bloc = projet?.blocs?.find(b => b.id === blocId);
+        if (!bloc) return;
+
+        // Mettre à jour le label "Fixer/Libérer"
+        document.getElementById('ctxFix').textContent = bloc.fige ? '🔓 Libérer' : '🔒 Fixer';
+
+        // Désactiver split si bloc déjà à 0.5j ou moins
+        const splitItem = document.getElementById('ctxSplit');
+        splitItem.style.opacity = bloc.jours <= 0.5 ? '0.4' : '1';
+        splitItem.style.pointerEvents = bloc.jours <= 0.5 ? 'none' : 'auto';
+
+        const menu = document.getElementById('ctxMenu');
+        menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+        menu.style.top = Math.min(e.clientY, window.innerHeight - 150) + 'px';
+        menu.classList.add('active');
+    },
+
+    hideCtxMenu() {
+        document.getElementById('ctxMenu').classList.remove('active');
+        this.ctxTarget = null;
+    },
+
+    ctxToggleFix() {
+        if (!this.ctxTarget) return;
+        const { projetId, blocId } = this.ctxTarget;
+        const projet = this.data.projets.find(p => p.id === projetId);
+        const bloc = projet?.blocs?.find(b => b.id === blocId);
+        if (bloc) {
+            bloc.fige = !bloc.fige;
+            this.saveData();
+            this.calendar.refetchEvents();
+            this.notify(bloc.fige ? '🔒 Fixé' : '🔓 Libéré', `Bloc du ${dayjs(bloc.date).format('DD/MM')}`, 'info');
+        }
+        this.hideCtxMenu();
+    },
+
+    ctxSplit() {
+        if (!this.ctxTarget) return;
+        const { projetId, blocId } = this.ctxTarget;
+        const projet = this.data.projets.find(p => p.id === projetId);
+        const bloc = projet?.blocs?.find(b => b.id === blocId);
+        if (!bloc || bloc.jours <= 0.5) { this.hideCtxMenu(); return; }
+
+        const moitie = Math.round((bloc.jours / 2) * 4) / 4;
+
+        // Réduire le bloc original à la moitié
+        bloc.jours = moitie;
+        bloc.fige = true;
+
+        // Trouver le prochain jour dispo pour la 2e moitié
+        let nextDate = dayjs(bloc.date).add(1, 'day');
+        const deadline = dayjs(projet.deadline);
+        let placed = false;
+
+        while (nextDate.isSameOrBefore(deadline, 'day')) {
+            if (this.isJourOuvre(nextDate) && !this.isJourOccupeGoogle(nextDate)) {
+                const dateStr = nextDate.format('YYYY-MM-DD');
+                const dejaPris = this.data.projets.some(p =>
+                    p.id !== projetId && (p.blocs || []).some(b => b.date === dateStr)
+                );
+                if (!dejaPris) {
+                    projet.blocs.push({
+                        id: this.generateId(),
+                        date: dateStr,
+                        jours: moitie,
+                        fige: true,
+                        source: bloc.source,
+                        milestoneId: bloc.milestoneId
+                    });
+                    placed = true;
+                    this.notify('Split', `${moitie}j → ${dayjs(bloc.date).format('DD/MM')} + ${nextDate.format('DD/MM')}`, 'success');
+                    break;
+                }
+            }
+            nextDate = nextDate.add(1, 'day');
+        }
+
+        if (!placed) {
+            this.notify('Split', `${moitie}j placé le ${dayjs(bloc.date).format('DD/MM')}, 2e moitié : pas de place trouvée`, 'warning');
+        }
+
+        this.saveData();
+        this.calendar.refetchEvents();
+        this.renderProjects();
+        this.hideCtxMenu();
+    },
+
+    ctxDelete() {
+        if (!this.ctxTarget) return;
+        const { projetId, blocId } = this.ctxTarget;
+        const projet = this.data.projets.find(p => p.id === projetId);
+        if (projet) {
+            projet.blocs = (projet.blocs || []).filter(b => b.id !== blocId);
+            this.saveData();
+            this.calendar.refetchEvents();
+            this.renderProjects();
+            this.updateCapacity();
+            this.notify('Supprimé', 'Bloc retiré', 'info');
+        }
+        this.hideCtxMenu();
+    },
+
+    // =============================================
+    // NOTIFICATIONS
+    // =============================================
+    notify(title, msg, type = 'info') {
+        const container = document.getElementById('notifContainer');
+        const el = document.createElement('div');
+        el.className = `notif ${type}`;
+        el.innerHTML = `<strong>${title}</strong> · ${msg}`;
+        container.appendChild(el);
+        setTimeout(() => el.remove(), 4000);
+    }
+};
+
+// =============================================
+// BOOT
+// =============================================
+document.addEventListener('DOMContentLoaded', () => app.init());
+</script>
+    <!-- Menu contextuel blocs -->
+    <div class="ctx-menu" id="ctxMenu">
+        <div class="ctx-item" id="ctxFix" onclick="app.ctxToggleFix()">🔒 Fixer</div>
+        <div class="ctx-item" id="ctxSplit" onclick="app.ctxSplit()">✂️ Splitter en 2</div>
+        <div class="ctx-separator"></div>
+        <div class="ctx-item danger" onclick="app.ctxDelete()">🗑 Supprimer</div>
+    </div>
+</body>
+</html>
