@@ -1022,6 +1022,7 @@ const app = {
         this.initCalendar();
         this.updateCapacity();
         this.renderProjects();
+        this.trySilentGoogleAuth();
         // Sécurité Chrome : re-render après le premier paint
         setTimeout(() => {
             this.calendar.refetchEvents();
@@ -1094,15 +1095,33 @@ const app = {
                 client_id: CONFIG.GOOGLE_CLIENT_ID,
                 scope: CONFIG.SCOPES,
                 callback: (response) => {
+                    const wasSilent = this.silentAuth;
+                    this.silentAuth = false;
                     if (response.error) {
+                        if (wasSilent) {
+                            // Reconnexion silencieuse impossible (session Google expirée, consentement à refaire...)
+                            localStorage.removeItem('staffing_google_authorized');
+                            console.log('[Staffing] reconnexion silencieuse échouée:', response.error);
+                            return;
+                        }
                         this.notify('Erreur Google', response.error, 'error');
                         return;
                     }
                     this.accessToken = response.access_token;
                     this.googleConnected = true;
+                    localStorage.setItem('staffing_google_authorized', '1');
                     this.updateGoogleStatus(true);
                     this.loadGoogleEvents();
-                    this.notify('Google Calendar', 'Connecté ! Chargement de l\'agenda...', 'success');
+                    if (!wasSilent) {
+                        this.notify('Google Calendar', 'Connecté ! Chargement de l\'agenda...', 'success');
+                    }
+                },
+                error_callback: (err) => {
+                    // Popup bloquée / fermée pendant une reconnexion silencieuse : on reste discret
+                    if (this.silentAuth) {
+                        this.silentAuth = false;
+                        console.log('[Staffing] reconnexion silencieuse impossible:', err?.type);
+                    }
                 }
             });
             return true;
@@ -1116,6 +1135,7 @@ const app = {
         if (this.googleConnected) {
             // Déconnecter
             google.accounts.oauth2.revoke(this.accessToken);
+            localStorage.removeItem('staffing_google_authorized');
             this.googleConnected = false;
             this.accessToken = null;
             this.googleEvents = [];
@@ -1128,6 +1148,16 @@ const app = {
 
         if (!this.tokenClient && !this.initGoogleAuth()) return;
         this.tokenClient.requestAccessToken({ prompt: '' });
+    },
+
+    // Reconnexion sans interaction (si l'utilisateur a déjà autorisé l'app et reste connecté à Google)
+    trySilentGoogleAuth() {
+        if (this.googleConnected || !CONFIG.GOOGLE_CLIENT_ID) return;
+        if (!localStorage.getItem('staffing_google_authorized')) return;
+        if (typeof google === 'undefined' || !google.accounts?.oauth2) return;
+        if (!this.tokenClient && !this.initGoogleAuth()) return;
+        this.silentAuth = true;
+        this.tokenClient.requestAccessToken({ prompt: 'none' });
     },
 
     updateGoogleStatus(connected) {
@@ -1164,9 +1194,16 @@ const app = {
                 this.googleConnected = false;
                 this.accessToken = null;
                 this.updateGoogleStatus(false);
+                // Token expiré (1h) : tentative de renouvellement silencieux avant de déranger l'utilisateur
+                if (localStorage.getItem('staffing_google_authorized') && !this.silentRetried) {
+                    this.silentRetried = true;
+                    this.trySilentGoogleAuth();
+                    return;
+                }
                 this.notify('Google', 'Session expirée — reconnecte-toi', 'warning');
                 return;
             }
+            this.silentRetried = false;
 
             const primaryData = await primaryResp.json();
             const holidaysData = await holidaysResp.json();
