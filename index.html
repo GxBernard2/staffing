@@ -688,6 +688,11 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
+        /* Blocs figés — bordure latérale distinctive */
+        .fc-event.bloc-fige {
+            border-left: 3px solid rgba(255,255,255,0.7) !important;
+        }
+
         /* Menu contextuel */
         .ctx-menu {
             position: fixed;
@@ -747,7 +752,7 @@
                 <path fill="#fbbc05" d="M5.525 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62h-3.98a11.86 11.86 0 000 10.76l3.98-3.09z"/>
                 <path fill="#ea4335" d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0c-4.64 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"/>
             </svg>
-            Google Calendar
+            <span id="googleAuthLabel">Google Calendar</span>
         </button>
         <button class="btn" onclick="app.replanifyAndRefresh()" title="Recharger Google Cal et redistribuer les projets">⚙️ Re-planifier</button>
         <button class="btn" onclick="app.openConfig()">⚙</button>
@@ -1010,6 +1015,13 @@ const app = {
         this.updateCapacity();
         this.renderProjects();
 
+        // Onboarding : si pas de Client ID configuré, ouvrir le panel config
+        if (!CONFIG.GOOGLE_CLIENT_ID && this.data.projets.length === 0) {
+            setTimeout(() => {
+                this.notify('Bienvenue', 'Configure ton Google Client ID dans ⚙️ pour connecter ton agenda', 'info');
+            }, 800);
+        }
+
         // Fermer config et menu contextuel en cliquant ailleurs
         document.addEventListener('click', (e) => {
             if (!document.getElementById('configPanel').contains(e.target)
@@ -1017,6 +1029,15 @@ const app = {
                 this.closeConfig();
             }
             if (!e.target.closest('#ctxMenu')) {
+                this.hideCtxMenu();
+            }
+        });
+
+        // Escape : fermer modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeProjectModal();
+                this.closeConfig();
                 this.hideCtxMenu();
             }
         });
@@ -1075,9 +1096,7 @@ const app = {
     updateGoogleStatus(connected) {
         document.getElementById('googleDot').className = 'google-dot' + (connected ? ' connected' : '');
         document.getElementById('googleStatusText').textContent = connected ? 'Google connecté' : 'Non connecté';
-        document.getElementById('googleAuthBtn').querySelector('span') &&
-            (document.getElementById('googleAuthBtn').lastChild.textContent =
-                connected ? ' Déconnecter' : ' Google Calendar');
+        document.getElementById('googleAuthLabel').textContent = connected ? 'Déconnecter' : 'Google Calendar';
     },
 
     async loadGoogleEvents() {
@@ -1100,8 +1119,17 @@ const app = {
                     `https://www.googleapis.com/calendar/v3/calendars/fr.french%23holiday%40group.v.calendar.google.com/events?` +
                     `timeMin=${rangeStart}&timeMax=${rangeEnd}&singleEvents=true&orderBy=startTime&maxResults=50`,
                     { headers: { Authorization: `Bearer ${this.accessToken}` } }
-                ).catch(() => ({ json: () => ({ items: [] }) }))
+                ).catch(() => ({ ok: true, json: () => ({ items: [] }) }))
             ]);
+
+            // Token expiré ?
+            if (primaryResp.status === 401) {
+                this.googleConnected = false;
+                this.accessToken = null;
+                this.updateGoogleStatus(false);
+                this.notify('Google', 'Session expirée — reconnecte-toi', 'warning');
+                return;
+            }
 
             const primaryData = await primaryResp.json();
             const holidaysData = await holidaysResp.json();
@@ -1181,11 +1209,12 @@ const app = {
                         const isJalon = bloc.source === 'jalon' || bloc.source === 'jalon_avant';
                         const ms = isJalon ? projet.milestones?.find(m => m.id === bloc.milestoneId) : null;
                         const joursLabel = bloc.jours !== 1 ? ` · ${bloc.jours}j` : ' · 1j';
+                        const figeLabel = bloc.fige ? ' 🔒' : '';
                         const label = isJalon && ms
                             ? (bloc.source === 'jalon'
-                                ? `🏁 ${ms.nom}${joursLabel}`
-                                : `⏱ ${ms.nom} (avant)${joursLabel}`)
-                            : `${projet.nom}${joursLabel}`;
+                                ? `🏁 ${ms.nom}${joursLabel}${figeLabel}`
+                                : `⏱ ${ms.nom} (avant)${joursLabel}${figeLabel}`)
+                            : `${projet.nom}${joursLabel}${figeLabel}`;
 
                         events.push({
                             id: 'bloc_' + bloc.id,
@@ -1276,7 +1305,7 @@ const app = {
             },
             eventClick: (info) => {
                 const { type, projetId } = info.event.extendedProps;
-                if (type === 'projet' || type === 'bg') {
+                if (type === 'bloc' || type === 'bg') {
                     this.openEditProject(projetId);
                 }
             },
@@ -1416,8 +1445,18 @@ const app = {
 
         tousJalons.forEach(({ projet, ms, type, date, jours }) => {
             if (type === 'pendant') {
-                if (this.isJourLibre(date, null)) {
-                    projet.blocs.push({ id: this.generateId(), date: date.format('YYYY-MM-DD'), jours: Math.min(jours, 1), fige: false, source: 'jalon', milestoneId: ms.id });
+                const dateStr = date.format('YYYY-MM-DD');
+                if (this.isJourOuvre(date) && !this.isJourOccupeGoogle(date)) {
+                    // Calculer dispo restante ce jour
+                    const dispo = this.getDispoJour(date);
+                    let joursPoces = 0;
+                    this.data.projets.forEach(p => {
+                        (p.blocs || []).forEach(b => { if (b.date === dateStr) joursPoces += (b.jours || 1); });
+                    });
+                    const dispoRestante = Math.round((dispo - joursPoces) * 100) / 100;
+                    if (dispoRestante > 0) {
+                        projet.blocs.push({ id: this.generateId(), date: dateStr, jours: Math.min(jours, dispoRestante), fige: false, source: 'jalon', milestoneId: ms.id });
+                    }
                 }
             } else {
                 // Avant : remonter depuis la veille
@@ -1425,14 +1464,24 @@ const app = {
                 let placed = 0;
                 const kickoff = dayjs(projet.kickoff);
                 while (placed < jours && cur.isSameOrAfter(kickoff, 'day')) {
-                    if (this.isJourLibre(cur, null)) {
-                        projet.blocs.push({ id: this.generateId(), date: cur.format('YYYY-MM-DD'), jours: Math.min(jours - placed, 1), fige: false, source: 'jalon_avant', milestoneId: ms.id });
-                        placed++;
+                    if (this.isJourOuvre(cur) && !this.isJourOccupeGoogle(cur)) {
+                        const dateStr = cur.format('YYYY-MM-DD');
+                        const dispo = this.getDispoJour(cur);
+                        let joursPoces = 0;
+                        this.data.projets.forEach(p => {
+                            (p.blocs || []).forEach(b => { if (b.date === dateStr) joursPoces += (b.jours || 1); });
+                        });
+                        const dispoRestante = Math.round((dispo - joursPoces) * 100) / 100;
+                        if (dispoRestante > 0) {
+                            const aPoser = Math.min(jours - placed, dispoRestante);
+                            projet.blocs.push({ id: this.generateId(), date: dateStr, jours: aPoser, fige: false, source: 'jalon_avant', milestoneId: ms.id });
+                            placed = Math.round((placed + aPoser) * 100) / 100;
+                        }
                     }
                     cur = cur.subtract(1, 'day');
                 }
-                if (placed < jours) {
-                    this.notify('Jalon', `Impossible de placer ${jours - placed}j avant "${ms.nom}" (${projet.nom})`, 'warning');
+                if (placed < jours - 0.01) {
+                    this.notify('Jalon', `Impossible de placer ${Math.round((jours - placed)*100)/100}j avant "${ms.nom}" (${projet.nom})`, 'warning');
                 }
             }
         });
@@ -1549,42 +1598,18 @@ const app = {
     },
 
     calculateProjetsDays() {
-        // Jours projets qui chevauchent ce mois
+        // Jours projets réellement placés (blocs) dans le mois courant
         const monthStart = this.currentMonth.startOf('month');
         const monthEnd = this.currentMonth.endOf('month');
         let total = 0;
 
         this.data.projets.forEach(projet => {
-            const pStart = dayjs(projet.kickoff);
-            const pEnd = dayjs(projet.deadline);
-
-            // Calculer l'intersection avec le mois
-            const overlapStart = pStart.isAfter(monthStart) ? pStart : monthStart;
-            const overlapEnd = pEnd.isBefore(monthEnd) ? pEnd : monthEnd;
-
-            if (overlapStart.isSameOrBefore(overlapEnd, 'day')) {
-                // Nb jours ouvrés dans l'overlap
-                let current = overlapStart;
-                let daysInMonth = 0;
-                let totalDays = 0;
-                while (current.isSameOrBefore(overlapEnd, 'day')) {
-                    if (current.day() !== 0 && current.day() !== 6) daysInMonth++;
-                    current = current.add(1, 'day');
+            (projet.blocs || []).forEach(bloc => {
+                const d = dayjs(bloc.date);
+                if (d.isSameOrAfter(monthStart, 'day') && d.isSameOrBefore(monthEnd, 'day')) {
+                    total += (bloc.jours || 1);
                 }
-
-                // Durée totale du projet
-                let totalWorkDays = 0;
-                let c = pStart;
-                while (c.isSameOrBefore(pEnd, 'day')) {
-                    if (c.day() !== 0 && c.day() !== 6) totalWorkDays++;
-                    c = c.add(1, 'day');
-                }
-
-                // Prorata des jours vendus
-                if (totalWorkDays > 0) {
-                    total += (daysInMonth / totalWorkDays) * projet.joursVendus;
-                }
-            }
+            });
         });
         return Math.round(total * 4) / 4; // Arrondi 0.25j
     },
@@ -1653,6 +1678,11 @@ const app = {
             const elapsed = dayjs().diff(dayjs(projet.kickoff), 'day');
             const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
 
+            // Jours réellement placés vs vendus
+            const joursPlaces = (projet.blocs || []).reduce((s, b) => s + (b.jours || 1), 0);
+            const joursRestants = Math.round((projet.joursVendus - joursPlaces) * 100) / 100;
+            const placementOk = joursRestants <= 0.01;
+
             return `
                 <div class="project-item" onclick="app.openEditProject('${projet.id}')">
                     <div class="project-row1">
@@ -1664,9 +1694,15 @@ const app = {
                         <span>P${projet.priorite} · ${projet.joursVendus}j</span>
                         <span>📅 ${deadlineLabel} · ${daysLeftLabel}</span>
                     </div>
+                    <div class="project-row2" style="margin-top:2px">
+                        ${placementOk
+                            ? `<span style="color:var(--green)">✓ ${joursPlaces}j placés</span>`
+                            : `<span style="color:var(--amber)">⚠ ${joursPlaces}j / ${projet.joursVendus}j (reste ${joursRestants}j)</span>`
+                        }
+                        <span>${projet.client || ''}</span>
+                    </div>
                     ${projet.milestones?.length ? `<div class="project-row2" style="margin-top:2px">
                         <span>🏁 ${projet.milestones.length} jalon${projet.milestones.length > 1 ? 's' : ''}</span>
-                        <span>${projet.client || ''}</span>
                     </div>` : ''}
                     <div class="project-progress">
                         <div class="project-progress-fill" style="width:${progress}%;background:${projet.couleur}"></div>
@@ -1741,12 +1777,23 @@ const app = {
         if (this.editingProjectId) {
             const idx = this.data.projets.findIndex(p => p.id === this.editingProjectId);
             if (idx >= 0) {
+                // Nettoyer les blocs figés hors de la nouvelle fenêtre
+                const existingBlocs = this.data.projets[idx].blocs || [];
+                const filteredBlocs = existingBlocs.filter(b => {
+                    const d = dayjs(b.date);
+                    return d.isSameOrAfter(dayjs(kickoff), 'day') && d.isSameOrBefore(dayjs(deadline), 'day');
+                });
+                const removed = existingBlocs.length - filteredBlocs.length;
+                if (removed > 0) {
+                    this.notify('Projet', `${removed} bloc(s) hors période supprimé(s)`, 'info');
+                }
                 this.data.projets[idx] = {
                     ...this.data.projets[idx],
                     nom, client, joursVendus, kickoff, deadline,
                     priorite: this.selectedPrio,
                     couleur: this.selectedColor,
-                    milestones
+                    milestones,
+                    blocs: filteredBlocs
                 };
                 this.notify('Projet', 'Modifié avec succès', 'success');
             }
@@ -1823,15 +1870,23 @@ const app = {
     collectMilestones() {
         const rows = document.getElementById('milestonesList').children;
         const milestones = [];
-        Array.from(rows).forEach(row => {
+        // Récupérer les milestones existants pour préserver les IDs
+        const existingProject = this.editingProjectId
+            ? this.data.projets.find(p => p.id === this.editingProjectId)
+            : null;
+        const existingMs = existingProject?.milestones || [];
+
+        Array.from(rows).forEach((row, idx) => {
             const inputs = row.querySelectorAll('input');
             const nom = inputs[0]?.value.trim();
             const date = inputs[1]?.value;
             const joursAvant = parseFloat(inputs[2]?.value) || 0;
             const joursPendant = parseFloat(inputs[3]?.value) || 0;
             if (nom && date) {
+                // Réutiliser l'ID existant si même index (préserve les liens milestoneId dans les blocs)
+                const existingId = existingMs[idx]?.id;
                 milestones.push({
-                    id: 'ms_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                    id: existingId || ('ms_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
                     nom, date, joursAvant, joursPendant
                 });
             }
@@ -2187,10 +2242,13 @@ Règles :
         while (nextDate.isSameOrBefore(deadline, 'day')) {
             if (this.isJourOuvre(nextDate) && !this.isJourOccupeGoogle(nextDate)) {
                 const dateStr = nextDate.format('YYYY-MM-DD');
-                const dejaPris = this.data.projets.some(p =>
-                    p.id !== projetId && (p.blocs || []).some(b => b.date === dateStr)
-                );
-                if (!dejaPris) {
+                const dispo = this.getDispoJour(nextDate);
+                let joursPoces = 0;
+                this.data.projets.forEach(p => {
+                    (p.blocs || []).forEach(b => { if (b.date === dateStr) joursPoces += (b.jours || 1); });
+                });
+                const dispoRestante = Math.round((dispo - joursPoces) * 100) / 100;
+                if (dispoRestante >= moitie) {
                     projet.blocs.push({
                         id: this.generateId(),
                         date: dateStr,
