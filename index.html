@@ -1018,9 +1018,15 @@ const app = {
     init() {
         this.loadConfig();
         this.loadData();
+        console.log('[Staffing] init — projets chargés:', this.data.projets?.length ?? 0, this.data.projets?.map(p => p.nom));
         this.initCalendar();
         this.updateCapacity();
         this.renderProjects();
+        // Sécurité Chrome : re-render après le premier paint
+        setTimeout(() => {
+            this.calendar.refetchEvents();
+            this.renderProjects();
+        }, 300);
 
         // Onboarding : si pas de Client ID configuré, ouvrir le panel config
         if (!CONFIG.GOOGLE_CLIENT_ID && this.data.projets.length === 0) {
@@ -1043,14 +1049,23 @@ const app = {
             }
         });
 
-        // Fermer le menu contextuel Google si clic droit ailleurs
+        // Clic droit sur events Google → menu d'assignation
+        // Listener sur document pour survivre aux re-renders FullCalendar
         document.addEventListener('contextmenu', (e) => {
-            if (!e.target.closest('#ctxGoogleMenu') && !e.target.closest('.google-event')) {
-                this.hideGoogleCtxMenu();
+            const googleEl = e.target.closest('.google-event');
+            if (googleEl) {
+                e.preventDefault();
+                const googleEventId = googleEl.dataset.googleEventId;
+                if (googleEventId) {
+                    const gev = this.googleEvents.find(g => g.id === googleEventId);
+                    const currentAssignedId = gev ? this.getAssignedProjet(gev) : null;
+                    this.showGoogleCtxMenu(e, googleEventId, currentAssignedId);
+                }
+                return;
             }
-            if (!e.target.closest('#ctxMenu') && !e.target.closest('.fc-event[data-bloc]')) {
-                this.hideCtxMenu();
-            }
+            // Fermer les menus si clic droit ailleurs
+            if (!e.target.closest('#ctxGoogleMenu')) this.hideGoogleCtxMenu();
+            if (!e.target.closest('#ctxMenu')) this.hideCtxMenu();
         });
 
         // Escape : fermer modals
@@ -1182,6 +1197,7 @@ const app = {
             initialDate: this.currentMonth.format('YYYY-MM-DD'),
             events: (info, successCallback) => {
                 const events = [];
+                console.log('[Staffing] events callback — projets:', this.data.projets?.length, 'googleEvents:', this.googleEvents?.length);
 
                 // Events Google Calendar
                 this.googleEvents.forEach(ev => {
@@ -1351,20 +1367,6 @@ const app = {
             }
         });
         this.calendar.render();
-
-        // Délégation contextmenu sur le conteneur calendrier
-        // data-google-event-id est posé par eventDidMount ; on le lit ici
-        el.addEventListener('contextmenu', (e) => {
-            const eventEl = e.target.closest('.google-event');
-            if (!eventEl) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const googleEventId = eventEl.dataset.googleEventId;
-            if (!googleEventId) return;
-            const gev = this.googleEvents.find(g => g.id === googleEventId);
-            const currentAssignedId = gev ? this.getAssignedProjet(gev) : null;
-            this.showGoogleCtxMenu(e, googleEventId, currentAssignedId);
-        });
 
         // Init label
         document.getElementById('currentMonthLabel').textContent =
