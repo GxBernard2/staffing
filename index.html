@@ -1043,6 +1043,16 @@ const app = {
             }
         });
 
+        // Fermer le menu contextuel Google si clic droit ailleurs
+        document.addEventListener('contextmenu', (e) => {
+            if (!e.target.closest('#ctxGoogleMenu') && !e.target.closest('.google-event')) {
+                this.hideGoogleCtxMenu();
+            }
+            if (!e.target.closest('#ctxMenu') && !e.target.closest('.fc-event[data-bloc]')) {
+                this.hideCtxMenu();
+            }
+        });
+
         // Escape : fermer modals
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
@@ -1335,7 +1345,12 @@ const app = {
                 }
                 if (type === 'google') {
                     info.el.addEventListener('contextmenu', (e) => {
-                        this.showGoogleCtxMenu(e, googleEventId, assignedProjetId);
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Relire l'assignation courante (pas la valeur capturée au mount)
+                        const gev = this.googleEvents.find(g => g.id === googleEventId);
+                        const currentAssignedId = gev ? this.getAssignedProjet(gev) : null;
+                        this.showGoogleCtxMenu(e, googleEventId, currentAssignedId);
                     });
                 }
             }
