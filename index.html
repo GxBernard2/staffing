@@ -2406,8 +2406,8 @@ Règles :
 
     ctxGoogleAssign() {
         if (!this.ctxGoogleTarget) return;
-        this.hideGoogleCtxMenu();
         const { googleEventId } = this.ctxGoogleTarget;
+        this.hideGoogleCtxMenu();
         this.openAssignModal(googleEventId);
     },
 
