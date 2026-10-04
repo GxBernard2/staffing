@@ -1337,25 +1337,34 @@ const app = {
                 }
             },
             eventDidMount: (info) => {
-                const { type, projetId, blocId, googleEventId, assignedProjetId } = info.event.extendedProps;
+                const { type, projetId, blocId, googleEventId } = info.event.extendedProps;
                 if (type === 'bloc') {
                     info.el.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
                         this.showCtxMenu(e, projetId, blocId);
                     });
                 }
-                if (type === 'google') {
-                    info.el.addEventListener('contextmenu', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Relire l'assignation courante (pas la valeur capturée au mount)
-                        const gev = this.googleEvents.find(g => g.id === googleEventId);
-                        const currentAssignedId = gev ? this.getAssignedProjet(gev) : null;
-                        this.showGoogleCtxMenu(e, googleEventId, currentAssignedId);
-                    });
+                if (type === 'google' && googleEventId) {
+                    // Stocker l'ID dans un data-* pour la délégation contextmenu
+                    info.el.dataset.googleEventId = googleEventId;
                 }
             }
         });
         this.calendar.render();
+
+        // Délégation contextmenu sur le conteneur calendrier
+        // data-google-event-id est posé par eventDidMount ; on le lit ici
+        el.addEventListener('contextmenu', (e) => {
+            const eventEl = e.target.closest('.google-event');
+            if (!eventEl) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const googleEventId = eventEl.dataset.googleEventId;
+            if (!googleEventId) return;
+            const gev = this.googleEvents.find(g => g.id === googleEventId);
+            const currentAssignedId = gev ? this.getAssignedProjet(gev) : null;
+            this.showGoogleCtxMenu(e, googleEventId, currentAssignedId);
+        });
 
         // Init label
         document.getElementById('currentMonthLabel').textContent =
