@@ -972,6 +972,10 @@
 dayjs.extend(window.dayjs_plugin_isSameOrBefore);
 dayjs.extend(window.dayjs_plugin_isSameOrAfter);
 
+function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // =============================================
 // CONFIG
 // =============================================
@@ -1005,6 +1009,9 @@ const app = {
     },
     holidays: new Set(),
 
+    // eventId → projetId (associations manuelles/auto sauvegardées)
+    googleAssignments: {},
+
     // =============================================
     // INIT
     // =============================================
@@ -1030,6 +1037,9 @@ const app = {
             }
             if (!e.target.closest('#ctxMenu')) {
                 this.hideCtxMenu();
+            }
+            if (!e.target.closest('#ctxGoogleMenu')) {
+                this.hideGoogleCtxMenu();
             }
         });
 
@@ -1166,16 +1176,23 @@ const app = {
                 // Events Google Calendar
                 this.googleEvents.forEach(ev => {
                     if (!ev.start) return;
+                    const assignedProjetId = this.getAssignedProjet(ev);
+                    const assignedProjet = assignedProjetId
+                        ? this.data.projets.find(p => p.id === assignedProjetId)
+                        : null;
+                    const isAssigned = !!assignedProjet;
                     events.push({
                         id: 'g_' + ev.id,
-                        title: ev.summary || '(sans titre)',
+                        title: isAssigned
+                            ? `📌 ${assignedProjet.nom} · ${ev.summary || '(sans titre)'}`
+                            : (ev.summary || '(sans titre)'),
                         start: ev.start.dateTime || ev.start.date,
                         end: ev.end?.dateTime || ev.end?.date,
-                        backgroundColor: '#e2e8f0',
-                        borderColor: '#94a3b8',
-                        textColor: '#475569',
-                        className: 'google-event',
-                        extendedProps: { type: 'google' }
+                        backgroundColor: isAssigned ? assignedProjet.couleur + 'cc' : '#e2e8f0',
+                        borderColor: isAssigned ? assignedProjet.couleur : '#94a3b8',
+                        textColor: isAssigned ? '#fff' : '#475569',
+                        className: isAssigned ? 'google-event google-assigned' : 'google-event',
+                        extendedProps: { type: 'google', googleEventId: ev.id, assignedProjetId }
                     });
                 });
 
@@ -1310,10 +1327,15 @@ const app = {
                 }
             },
             eventDidMount: (info) => {
-                const { type, projetId, blocId } = info.event.extendedProps;
+                const { type, projetId, blocId, googleEventId, assignedProjetId } = info.event.extendedProps;
                 if (type === 'bloc') {
                     info.el.addEventListener('contextmenu', (e) => {
                         this.showCtxMenu(e, projetId, blocId);
+                    });
+                }
+                if (type === 'google') {
+                    info.el.addEventListener('contextmenu', (e) => {
+                        this.showGoogleCtxMenu(e, googleEventId, assignedProjetId);
                     });
                 }
             }
@@ -1417,6 +1439,99 @@ const app = {
     },
 
     // =============================================
+    // ASSIGNATION EVENTS GOOGLE → PROJETS
+    // =============================================
+
+    // Détecte automatiquement le projet depuis le titre "NOM - Action"
+    detectProjetFromTitle(title) {
+        if (!title) return null;
+        const lower = title.toLowerCase();
+        // Cherche "NOM -" ou "NOM—" au début ou n'importe où
+        for (const projet of this.data.projets) {
+            const nom = projet.nom.toLowerCase();
+            const client = (projet.client || '').toLowerCase();
+            // Teste: titre commence par "nom -" ou "client -"
+            const candidates = [nom, client].filter(Boolean);
+            for (const candidate of candidates) {
+                if (!candidate) continue;
+                // "candidate - " au début (insensible casse, tiret simple ou double)
+                const regex = new RegExp(`^${escapeRegex(candidate)}\\s*[-–—]`, 'i');
+                if (regex.test(title.trim())) return projet.id;
+            }
+        }
+        return null;
+    },
+
+    // Retourne le projetId assigné à un event Google (manuel > auto)
+    getAssignedProjet(ev) {
+        const eventId = ev.id;
+        // 1. Assignment manuel explicite (peut être null pour désassigner)
+        if (eventId in this.googleAssignments) {
+            return this.googleAssignments[eventId] || null;
+        }
+        // 2. Détection auto par titre
+        return this.detectProjetFromTitle(ev.summary);
+    },
+
+    assignEvent(eventId, projetId) {
+        this.googleAssignments[eventId] = projetId; // null = désassigné explicitement
+        this.saveData();
+        this.calendar.refetchEvents();
+        this.updateCapacity();
+        this.renderProjects();
+    },
+
+    unassignEvent(eventId) {
+        this.googleAssignments[eventId] = null; // null = désassigné explicitement
+        this.saveData();
+        this.calendar.refetchEvents();
+        this.updateCapacity();
+        this.renderProjects();
+    },
+
+    // Calcule les heures consommées par les events Google assignés à un projet sur une date
+    getHeuresAssigneesProjet(projetId, date) {
+        let heures = 0;
+        const dateStr = date.format('YYYY-MM-DD');
+        this.googleEvents.forEach(ev => {
+            if (!ev.start?.dateTime) return;
+            if (ev.transparency === 'transparent') return;
+            if (ev.status === 'cancelled') return;
+            const selfAttendee = ev.attendees?.find(a => a.self);
+            if (selfAttendee?.responseStatus === 'declined') return;
+            const evStart = dayjs(ev.start.dateTime);
+            if (!evStart.isSame(date, 'day')) return;
+            if (this.getAssignedProjet(ev) === projetId) {
+                const evEnd = dayjs(ev.end?.dateTime || ev.start.dateTime);
+                heures += evEnd.diff(evStart, 'hour', true);
+            }
+        });
+        return heures;
+    },
+
+    // Jours consommés par les events assignés à un projet (sur toute la durée)
+    getJoursAssignesProjet(projet) {
+        let total = 0;
+        this.googleEvents.forEach(ev => {
+            if (!ev.start?.dateTime) return;
+            if (ev.transparency === 'transparent') return;
+            if (ev.status === 'cancelled') return;
+            const selfAttendee = ev.attendees?.find(a => a.self);
+            if (selfAttendee?.responseStatus === 'declined') return;
+            if (this.getAssignedProjet(ev) !== projet.id) return;
+            // Vérifier que l'event est dans la fenêtre du projet
+            const evStart = dayjs(ev.start.dateTime);
+            if (evStart.isBefore(dayjs(projet.kickoff), 'day')) return;
+            if (evStart.isAfter(dayjs(projet.deadline), 'day')) return;
+            const evEnd = dayjs(ev.end?.dateTime || ev.start.dateTime);
+            const heures = evEnd.diff(evStart, 'hour', true);
+            // Convertir en fraction de journée (tranches de 2h)
+            total += Math.min(1, heures / CONFIG.HEURES_JOUR);
+        });
+        return Math.round(total * 4) / 4;
+    },
+
+    // =============================================
     // ALGO DE PLACEMENT
     // =============================================
     repartirTout() {
@@ -1490,7 +1605,8 @@ const app = {
         const alertes = [];
         projetsActifs.forEach(projet => {
             const dejaPlaces = (projet.blocs || []).reduce((s, b) => s + (b.jours || 1), 0);
-            let aRepartir = projet.joursVendus - dejaPlaces;
+            const joursGoogle = this.getJoursAssignesProjet(projet);
+            let aRepartir = Math.round((projet.joursVendus - dejaPlaces - joursGoogle) * 100) / 100;
             if (aRepartir <= 0) return;
 
             let cur = dayjs(projet.deadline);
@@ -1526,7 +1642,8 @@ const app = {
             }
             // Recalculer après placement (évite faux positifs)
             const finalPlaces = (projet.blocs || []).reduce((s, b) => s + (b.jours || 1), 0);
-            const finalRestant = Math.round((projet.joursVendus - finalPlaces) * 100) / 100;
+            const finalJoursGoogle = this.getJoursAssignesProjet(projet);
+            const finalRestant = Math.round((projet.joursVendus - finalPlaces - finalJoursGoogle) * 100) / 100;
             if (finalRestant > 0.01) {
                 alertes.push(`${projet.nom} : manque ${finalRestant}j à placer`);
             }
@@ -1598,7 +1715,7 @@ const app = {
     },
 
     calculateProjetsDays() {
-        // Jours projets réellement placés (blocs) dans le mois courant
+        // Jours projets réellement placés (blocs + events Google assignés) dans le mois courant
         const monthStart = this.currentMonth.startOf('month');
         const monthEnd = this.currentMonth.endOf('month');
         let total = 0;
@@ -1611,6 +1728,22 @@ const app = {
                 }
             });
         });
+
+        // Ajouter les jours des events Google assignés dans le mois
+        this.googleEvents.forEach(ev => {
+            if (!ev.start?.dateTime) return;
+            if (ev.transparency === 'transparent') return;
+            if (ev.status === 'cancelled') return;
+            const selfAttendee = ev.attendees?.find(a => a.self);
+            if (selfAttendee?.responseStatus === 'declined') return;
+            const evStart = dayjs(ev.start.dateTime);
+            if (!evStart.isSameOrAfter(monthStart, 'day') || !evStart.isSameOrBefore(monthEnd, 'day')) return;
+            if (!this.getAssignedProjet(ev)) return;
+            const evEnd = dayjs(ev.end?.dateTime || ev.start.dateTime);
+            const heures = evEnd.diff(evStart, 'hour', true);
+            total += Math.min(1, heures / CONFIG.HEURES_JOUR);
+        });
+
         return Math.round(total * 4) / 4; // Arrondi 0.25j
     },
 
@@ -1680,7 +1813,9 @@ const app = {
 
             // Jours réellement placés vs vendus
             const joursPlaces = (projet.blocs || []).reduce((s, b) => s + (b.jours || 1), 0);
-            const joursRestants = Math.round((projet.joursVendus - joursPlaces) * 100) / 100;
+            const joursGoogle = this.getJoursAssignesProjet(projet);
+            const joursTotal = Math.round((joursPlaces + joursGoogle) * 100) / 100;
+            const joursRestants = Math.round((projet.joursVendus - joursTotal) * 100) / 100;
             const placementOk = joursRestants <= 0.01;
 
             return `
@@ -1696,8 +1831,8 @@ const app = {
                     </div>
                     <div class="project-row2" style="margin-top:2px">
                         ${placementOk
-                            ? `<span style="color:var(--green)">✓ ${joursPlaces}j placés</span>`
-                            : `<span style="color:var(--amber)">⚠ ${joursPlaces}j / ${projet.joursVendus}j (reste ${joursRestants}j)</span>`
+                            ? `<span style="color:var(--green)">✓ ${joursTotal}j placés${joursGoogle > 0 ? ` (dont ${joursGoogle}j agenda)` : ''}</span>`
+                            : `<span style="color:var(--amber)">⚠ ${joursTotal}j / ${projet.joursVendus}j (reste ${joursRestants}j)${joursGoogle > 0 ? ` · 📌 ${joursGoogle}j agenda` : ''}</span>`
                         }
                         <span>${projet.client || ''}</span>
                     </div>
@@ -2124,12 +2259,17 @@ Règles :
     // =============================================
     saveData() {
         localStorage.setItem('staffing_data', JSON.stringify(this.data));
+        localStorage.setItem('staffing_assignments', JSON.stringify(this.googleAssignments));
     },
 
     loadData() {
         try {
             const saved = JSON.parse(localStorage.getItem('staffing_data') || '{}');
             if (saved.projets) this.data.projets = saved.projets;
+        } catch {}
+        try {
+            const savedA = JSON.parse(localStorage.getItem('staffing_assignments') || '{}');
+            this.googleAssignments = savedA;
         } catch {}
     },
 
@@ -2179,6 +2319,7 @@ Règles :
     // MENU CONTEXTUEL
     // =============================================
     ctxTarget: null,
+    ctxGoogleTarget: null,
 
     showCtxMenu(e, projetId, blocId) {
         e.preventDefault();
@@ -2205,6 +2346,79 @@ Règles :
     hideCtxMenu() {
         document.getElementById('ctxMenu').classList.remove('active');
         this.ctxTarget = null;
+    },
+
+    showGoogleCtxMenu(e, googleEventId, assignedProjetId) {
+        e.preventDefault();
+        this.ctxGoogleTarget = { googleEventId, assignedProjetId };
+
+        const menu = document.getElementById('ctxGoogleMenu');
+        const assignBtn = document.getElementById('ctxGoogleAssign');
+        const unassignBtn = document.getElementById('ctxGoogleUnassign');
+
+        if (assignedProjetId) {
+            const projet = this.data.projets.find(p => p.id === assignedProjetId);
+            assignBtn.textContent = `📌 Ré-assigner (${projet?.nom || '?'})`;
+            unassignBtn.style.display = '';
+        } else {
+            assignBtn.textContent = '📌 Assigner à un projet…';
+            unassignBtn.style.display = 'none';
+        }
+
+        menu.style.left = Math.min(e.clientX, window.innerWidth - 220) + 'px';
+        menu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
+        menu.classList.add('active');
+    },
+
+    hideGoogleCtxMenu() {
+        document.getElementById('ctxGoogleMenu').classList.remove('active');
+        this.ctxGoogleTarget = null;
+    },
+
+    ctxGoogleAssign() {
+        if (!this.ctxGoogleTarget) return;
+        this.hideGoogleCtxMenu();
+        const { googleEventId } = this.ctxGoogleTarget;
+        this.openAssignModal(googleEventId);
+    },
+
+    ctxGoogleUnassign() {
+        if (!this.ctxGoogleTarget) return;
+        const { googleEventId } = this.ctxGoogleTarget;
+        this.unassignEvent(googleEventId);
+        this.notify('Désassigné', 'Event retiré du projet', 'info');
+        this.hideGoogleCtxMenu();
+    },
+
+    openAssignModal(googleEventId) {
+        const projets = this.data.projets.filter(p => p.statut !== 'archive');
+        if (!projets.length) {
+            this.notify('Aucun projet', 'Créez d\'abord un projet', 'warning');
+            return;
+        }
+
+        // Construire la modal simple
+        let html = `<div id="assignModalOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;">
+            <div style="background:var(--bg2);border-radius:12px;padding:24px;min-width:280px;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+                <div style="font-weight:600;margin-bottom:16px;">Assigner à un projet</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">`;
+        projets.forEach(p => {
+            html += `<button onclick="app.doAssignEvent('${googleEventId}','${p.id}')"
+                style="background:${p.couleur}22;border:1px solid ${p.couleur}55;color:var(--text);border-radius:8px;padding:8px 12px;cursor:pointer;text-align:left;font-size:13px;">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.couleur};margin-right:8px;"></span>
+                ${p.nom}</button>`;
+        });
+        html += `</div><button onclick="document.getElementById('assignModalOverlay').remove()"
+            style="margin-top:16px;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px;cursor:pointer;font-size:13px;">Annuler</button>
+            </div></div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+    },
+
+    doAssignEvent(googleEventId, projetId) {
+        document.getElementById('assignModalOverlay')?.remove();
+        this.assignEvent(googleEventId, projetId);
+        const projet = this.data.projets.find(p => p.id === projetId);
+        this.notify('Assigné', `Event → ${projet?.nom || projetId}`, 'success');
     },
 
     ctxToggleFix() {
@@ -2314,6 +2528,12 @@ document.addEventListener('DOMContentLoaded', () => app.init());
         <div class="ctx-item" id="ctxSplit" onclick="app.ctxSplit()">✂️ Splitter en 2</div>
         <div class="ctx-separator"></div>
         <div class="ctx-item danger" onclick="app.ctxDelete()">🗑 Supprimer</div>
+    </div>
+
+    <!-- Menu contextuel events Google -->
+    <div class="ctx-menu" id="ctxGoogleMenu">
+        <div class="ctx-item" id="ctxGoogleAssign" onclick="app.ctxGoogleAssign()">📌 Assigner à un projet…</div>
+        <div class="ctx-item" id="ctxGoogleUnassign" onclick="app.ctxGoogleUnassign()" style="display:none">🗑 Désassigner</div>
     </div>
 </body>
 </html>
