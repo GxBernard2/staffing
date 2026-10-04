@@ -1052,10 +1052,12 @@ const app = {
         // Clic droit sur events Google → menu d'assignation
         // Listener sur document pour survivre aux re-renders FullCalendar
         document.addEventListener('contextmenu', (e) => {
+            console.log('[Staffing] contextmenu — target:', e.target.className, '| closest .google-event:', !!e.target.closest('.google-event'));
             const googleEl = e.target.closest('.google-event');
             if (googleEl) {
                 e.preventDefault();
                 const googleEventId = googleEl.dataset.googleEventId;
+                console.log('[Staffing] contextmenu sur google-event — googleEventId:', googleEventId, '| dataset:', JSON.stringify(googleEl.dataset));
                 if (googleEventId) {
                     const gev = this.googleEvents.find(g => g.id === googleEventId);
                     const currentAssignedId = gev ? this.getAssignedProjet(gev) : null;
@@ -1363,6 +1365,7 @@ const app = {
                 if (type === 'google' && googleEventId) {
                     // Stocker l'ID dans un data-* pour la délégation contextmenu
                     info.el.dataset.googleEventId = googleEventId;
+                    console.log('[Staffing] google eventDidMount — id posé sur el:', googleEventId, info.el.className);
                 }
             }
         });
